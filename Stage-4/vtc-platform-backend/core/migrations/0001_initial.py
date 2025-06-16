@@ -19,12 +19,46 @@ class Migration(migrations.Migration):
         migrations.CreateModel(
             name='Driver',
             fields=[
-                ('id', models.BigAutoField(auto_created=True, primary_key=True, serialize=False, verbose_name='ID')),
-                ('name', models.CharField(help_text='Nom complet du chauffeur', max_length=100)),
-                ('phone_number', models.CharField(help_text='Numéro de téléphone unique du chauffeur', max_length=17, unique=True, validators=[django.core.validators.RegexValidator(message="Le numéro de téléphone doit être au format: '+999999999'. 9 à 15 chiffres autorisés.", regex='^\\+?1?\\d{9,15}$')])),
-                ('email', models.EmailField(help_text='Adresse email unique du chauffeur', max_length=254, unique=True)),
-                ('license_number', models.CharField(help_text='Numéro de licence VTC unique', max_length=50, unique=True)),
-                ('vehicle_info', models.TextField(help_text='Informations sur le véhicule (marque, modèle, plaque, etc.)')),
+                (
+                    'id', models.BigAutoField(
+                        auto_created=True, primary_key=True,
+                        serialize=False, verbose_name='ID'
+                        )
+                    ),
+                (
+                    'name', models.CharField(
+                        help_text='Nom complet du chauffeur', max_length=100
+                        )
+                    ),
+                (
+                    'phone_number', models.CharField(
+                        help_text='Numéro de téléphone unique du chauffeur',
+                        max_length=17, unique=True,
+                        validators=[django.core.validators.RegexValidator(
+                            message="Le numéro de téléphone doit être au form"
+                            "at: '+999999999'. 9 à 15 chiffres autorisés.",
+                            regex='^\\+?1?\\d{9,15}$'
+                            )]
+                        )
+                    ),
+                (
+                    'email', models.EmailField(
+                        help_text='Adresse email unique du chauffeur',
+                        max_length=254, unique=True
+                        )
+                    ),
+                (
+                    'license_number', models.CharField(
+                        help_text='Numéro de licence VTC unique',
+                        max_length=50, unique=True
+                        )
+                    ),
+                (
+                    'vehicle_info', models.TextField(
+                        help_text='Informations sur le véhicule'
+                        ' (marque, modèle, plaque, etc.)'
+                        )
+                    ),
                 ('created_at', models.DateTimeField(auto_now_add=True)),
             ],
             options={
@@ -37,9 +71,22 @@ class Migration(migrations.Migration):
         migrations.CreateModel(
             name='User',
             fields=[
-                ('id', models.BigAutoField(auto_created=True, primary_key=True, serialize=False, verbose_name='ID')),
-                ('password', models.CharField(max_length=128, verbose_name='password')),
-                ('last_login', models.DateTimeField(blank=True, null=True, verbose_name='last login')),
+                (
+                    'id', models.BigAutoField(
+                        auto_created=True, primary_key=True,
+                        serialize=False, verbose_name='ID'
+                        )
+                    ),
+                (
+                    'password', models.CharField(
+                        max_length=128, verbose_name='password'
+                        )
+                    ),
+                (
+                    'last_login', models.DateTimeField(
+                        blank=True, null=True, verbose_name='last login'
+                        )
+                    ),
                 ('is_superuser', models.BooleanField(default=False, help_text='Designates that this user has all permissions without explicitly assigning them.', verbose_name='superuser status')),
                 ('username', models.CharField(error_messages={'unique': 'A user with that username already exists.'}, help_text='Required. 150 characters or fewer. Letters, digits and @/./+/-/_ only.', max_length=150, unique=True, validators=[django.contrib.auth.validators.UnicodeUsernameValidator()], verbose_name='username')),
                 ('first_name', models.CharField(blank=True, max_length=150, verbose_name='first name')),
