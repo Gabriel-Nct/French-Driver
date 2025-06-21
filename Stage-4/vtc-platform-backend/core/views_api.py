@@ -19,6 +19,11 @@ from .serializers import (
 from .services import (
     PricingService, NotificationService, DispatchService, InvoiceService
 )
+from rest_framework import permissions
+from rest_framework.exceptions import PermissionDenied
+from .models import Invoice
+from .models import Invoice
+from .serializers import InvoiceSerializer
 
 
 # ===============================
@@ -188,6 +193,13 @@ class AdminBookingUpdateView(generics.UpdateAPIView):
 
         # Sauvegarder les changements
         updated_booking = serializer.save()
+        if updated_booking.status == 'COMPLETED':
+            # on fixe la date de fin de course
+            updated_booking.completed_at = timezone.now()
+            updated_booking.save()
+            InvoiceService.generate_invoice(updated_booking) #ajout
+
+        
 
         # Envoyer des notifications si nécessaire
         if 'driver' in request.data and updated_booking.driver:
@@ -320,6 +332,8 @@ class DispatchView(APIView):
                     'message': str(e)
                 }
             }, status=status.HTTP_404_NOT_FOUND)
+        
+        
 
 
 # ===============================
@@ -372,7 +386,25 @@ class IsAdminUser(permissions.BasePermission):
             request.user.is_authenticated and
             request.user.is_admin_user()
         )
+    
+class InvoiceDetailView(generics.RetrieveAPIView):
+    """Récupère la facture associée à une réservation."""
+    queryset = Invoice.objects.all()
+    serializer_class = InvoiceSerializer
+    permission_classes = [permissions.IsAuthenticated]
 
+    def get_permissions(self):
+        # Tous les admins peuvent, les clients seulement leurs propres factures
+        base_perms = [permissions.IsAuthenticated()]
+        inst = self.get_object()
+        if self.request.user.is_admin_user() or inst.booking.user == self.request.user:
+            return base_perms
+        raise PermissionDenied("Vous n'avez pas le droit de voir cette facture.")
+    
+    def get_object(self):
+        # On se base sur booking_id dans l’URL plutôt que pk de la facture
+        booking_id = self.kwargs['booking_id']
+        return Invoice.objects.get(booking__id=booking_id)
 
 # ===============================
 # VUE DE SANTÉ (sans authentification)

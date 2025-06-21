@@ -14,6 +14,7 @@ import os
 from decouple import config
 from pathlib import Path
 from datetime import timedelta
+import certifi
 
 BASE_DIR = Path(__file__).resolve().parent.parent
 
@@ -147,14 +148,16 @@ DEFAULT_AUTO_FIELD = 'django.db.models.BigAutoField'
 # Custom User Model
 AUTH_USER_MODEL = 'core.User'
 
-# Email Configuration
-EMAIL_BACKEND = 'django.core.mail.backends.console.EmailBackend'
-# Pour production avec Gmail:
-# EMAIL_BACKEND = 'django.core.mail.backends.smtp.EmailBackend'
-# EMAIL_HOST = 'smtp.gmail.com'
-# EMAIL_PORT = 587
-# EMAIL_USE_TLS = True
-# EMAIL_HOST_USER = config('EMAIL_HOST_USER', default='')
-# EMAIL_HOST_PASSWORD = config('EMAIL_HOST_PASSWORD', default='')
 
-DEFAULT_FROM_EMAIL = 'noreply@french-driver.fr'
+# Pour production avec Gmail:
+# settings.py  –  section email
+EMAIL_BACKEND   = "django.core.mail.backends.smtp.EmailBackend"
+EMAIL_HOST      = "smtp.gmail.com"
+EMAIL_PORT      = 587           # 587 = StartTLS
+EMAIL_USE_TLS   = True          # Active TLS explicite
+EMAIL_USE_SSL   = False         # Désactive SSL implicite
+# Ne PAS définir EMAIL_SSL_CERTFILE / KEYFILE
+EMAIL_HOST_USER = config("EMAIL_HOST_USER")       # bookfrenchdriver@gmail.com
+EMAIL_HOST_PASSWORD = config("EMAIL_HOST_PASSWORD")  # votre mot de passe d’application
+DEFAULT_FROM_EMAIL = EMAIL_HOST_USER
+
