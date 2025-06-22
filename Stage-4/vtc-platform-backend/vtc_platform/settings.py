@@ -75,9 +75,18 @@ WSGI_APPLICATION = 'vtc_platform.wsgi.application'
 # Database (pour l'instant SQLite, on passera à PostgreSQL plus tard)
 DATABASES = {
     'default': {
-        'ENGINE': 'django.db.backends.sqlite3',
-        'NAME': BASE_DIR / 'db.sqlite3',
+        'ENGINE': 'django.db.backends.mysql',
+        'NAME': config('DB_NAME', default='vtc_platform'),
+        'USER': config('DB_USER', default='vtc_user'),
+        'PASSWORD': config('DB_PASSWORD', default='vtc_password_secure'),
+        'HOST': config('DB_HOST', default='localhost'),
+        'PORT': config('DB_PORT', default='3306'),
+        'OPTIONS': {
+            'charset': 'utf8mb4',
+            'use_unicode': True,
+            'init_command': "SET sql_mode='STRICT_TRANS_TABLES'",
     }
+}
 }
 
 # REST Framework configuration
