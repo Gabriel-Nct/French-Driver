@@ -72,5 +72,11 @@ urlpatterns = [
         'invoices/<int:booking_id>/',
         InvoiceDetailView.as_view(),
         name='invoice_detail'
-    ),
+        ),
+
+    # Telegram
+    path(
+        'telegram/webhook/', views_api.TelegramWebhookView.as_view(),
+        name='telegram_webhook'
+        ),
 ]

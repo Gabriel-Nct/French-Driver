@@ -28,6 +28,7 @@ class User(AbstractUser):
         validators=[phone_regex],
         max_length=17,
         blank=True,
+        default='',
         help_text="Numéro de téléphone au format international"
     )
 
@@ -84,6 +85,7 @@ class Driver(models.Model):
         validators=[phone_regex],
         max_length=17,
         unique=True,
+        default='',
         help_text="Numéro de téléphone unique du chauffeur"
     )
 
@@ -102,29 +104,57 @@ class Driver(models.Model):
         help_text="Informations sur le véhicule (marque, modèle, plaque, etc.)"
     )
 
+    telegram_chat_id = models.CharField(
+        max_length=50,
+        blank=True,
+        null=True,
+        help_text="Chat ID Telegram du chauffeur pour les notifications"
+    )
+    
+    telegram_username = models.CharField(
+        max_length=100,
+        blank=True,
+        null=True,
+        help_text="Username Telegram du chauffeur (optionnel)"
+    )
+    
+    # Paramètres de notification
+    notifications_enabled = models.BooleanField(
+        default=True,
+        help_text="Le chauffeur souhaite-t-il recevoir des notifications ?"
+    )
+    
     # Timestamp de création
     created_at = models.DateTimeField(auto_now_add=True)
-
+    
     class Meta:
         db_table = 'drivers'
         verbose_name = 'Chauffeur'
         verbose_name_plural = 'Chauffeurs'
         ordering = ['name']
-
+    
     def __str__(self):
         return f"{self.name} - {self.license_number}"
-
+    
     @property
     def display_phone(self):
         """Affiche le numéro de téléphone de manière formatée"""
         return self.phone_number
-
+    
     def get_vehicle_summary(self):
         """Retourne un résumé du véhicule (premiers 50 caractères)"""
         if len(self.vehicle_info) > 50:
             return self.vehicle_info[:50] + "..."
         else:
             return self.vehicle_info
+    
+    def has_telegram(self):
+        """Vérifie si le chauffeur a configuré Telegram"""
+        return bool(self.telegram_chat_id)
+    
+    def can_receive_notifications(self):
+        """Vérifie si le chauffeur peut recevoir des notifications"""
+        return self.notifications_enabled and self.has_telegram()
 
 
 class Booking(models.Model):

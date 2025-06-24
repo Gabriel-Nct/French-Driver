@@ -6,7 +6,8 @@ from django.conf import settings
 from django.core.mail import send_mail
 from django.template.loader import render_to_string
 from .models import Booking, Driver, Invoice
-
+import asyncio
+from .telegram_service import telegram_service
 
 class PricingService:
     """
@@ -176,7 +177,7 @@ class NotificationService:
         """
         try:
             subject = f"Nouvelle course disponible - {booking.pickup_address}"
-
+            
             message = f"""
             Bonjour {driver.name},
 
@@ -189,12 +190,12 @@ class NotificationService:
             - Prix estimé : {booking.estimated_price}€
             - Client : {booking.user.get_full_name()}
 
-            Pour accepter cette course, veuillez contacter la centrale.
+            Pour accepter cette course, veuillez contacter la centrale ou répondre via Telegram.
 
             Cordialement,
             L'équipe French Driver
             """
-
+            
             send_mail(
                 subject=subject,
                 message=message,
@@ -202,13 +203,37 @@ class NotificationService:
                 recipient_list=[driver.email],
                 fail_silently=False,
             )
-
-            return True
-
+            
+            success_email = True
+            
         except Exception as e:
             print(f"Erreur lors de l'envoi de l'email au chauffeur : {e}")
-            return False
+        
+        # 2. Notification par Telegram
+        if driver.can_receive_notifications():
+            try:
+                telegram_message = f"""
+                🚖 *NOUVELLE COURSE DISPONIBLE*
 
+                📍 *Départ :* {booking.pickup_address}
+                🎯 *Destination :* {booking.destination_address}
+                ⏰ *Heure :* {booking.scheduled_time.strftime('%d/%m/%Y à %H:%M')}
+                💰 *Prix :* {booking.estimated_price}€
+
+                👤 *Client :* {booking.user.get_full_name() or booking.user.username}
+
+                🔔 Contactez la centrale pour accepter !
+                """
+
+                response = requests.post(f"https://api.telegram.org/bot{settings.TELEGRAM_BOT_TOKEN}/sendMessage", json={"chat_id": driver.telegram_chat_id, "text": telegram_message,  "parse_mode": "Markdown"})
+
+                success_telegram = response.json().get("ok", False)
+
+
+            except Exception as e:
+                print(f"Erreur lors de l'envoi de la notification Telegram : {e}")
+        
+        return success_email or success_telegram
 
 class DispatchService:
     """

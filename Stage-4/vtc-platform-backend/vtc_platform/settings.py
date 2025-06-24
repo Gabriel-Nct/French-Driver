@@ -170,3 +170,8 @@ EMAIL_HOST_USER = config("EMAIL_HOST_USER")       # bookfrenchdriver@gmail.com
 EMAIL_HOST_PASSWORD = config("EMAIL_HOST_PASSWORD")  # votre mot de passe d’application
 DEFAULT_FROM_EMAIL = EMAIL_HOST_USER
 
+# Telegram Bot Configuration
+TELEGRAM_BOT_TOKEN = config('TELEGRAM_BOT_TOKEN', default='')
+TELEGRAM_WEBHOOK_URL = config('TELEGRAM_WEBHOOK_URL', default='')
+TELEGRAM_WEBHOOK_SECRET = config('TELEGRAM_WEBHOOK_SECRET', default='')
+TELEGRAM_DEBUG_CHAT_ID = config('TELEGRAM_DEBUG_CHAT_ID', default='')

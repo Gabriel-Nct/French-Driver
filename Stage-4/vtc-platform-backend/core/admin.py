@@ -69,13 +69,16 @@ class DriverAdmin(admin.ModelAdmin):
     """Administration pour le modèle Driver"""
 
     list_display = (
-        'name', 'email', 'phone_number',
-        'license_number', 'created_at'
-        )
-    list_filter = ('created_at',)
-    search_fields = ('name', 'email', 'phone_number', 'license_number')
+        'name', 'email', 'phone_number', 'license_number', 
+        'has_telegram', 'notifications_enabled', 'created_at'
+    )
+    list_filter = ('notifications_enabled', 'created_at')
+    search_fields = (
+        'name', 'email', 'phone_number', 'license_number', 
+        'telegram_username', 'telegram_chat_id'
+    )
     readonly_fields = ('created_at',)
-
+    
     fieldsets = (
         ('Informations personnelles', {
             'fields': ('name', 'email', 'phone_number')
@@ -83,11 +86,24 @@ class DriverAdmin(admin.ModelAdmin):
         ('Informations professionnelles', {
             'fields': ('license_number', 'vehicle_info')
         }),
+        ('Configuration Telegram', {
+            'fields': (
+                'telegram_chat_id', 'telegram_username', 
+                'notifications_enabled'
+            ),
+            'description': 'Le chauffeur doit utiliser /start sur le bot pour obtenir son Chat ID'
+        }),
         ('Métadonnées', {
             'fields': ('created_at',),
             'classes': ('collapse',)
         }),
     )
+    
+    def has_telegram(self, obj):
+        """Indique si le chauffeur a configuré Telegram"""
+        return obj.has_telegram()
+    has_telegram.boolean = True
+    has_telegram.short_description = 'Telegram configuré'
 
     def get_vehicle_summary(self, obj):
         """Affiche un résumé du véhicule dans l'admin"""

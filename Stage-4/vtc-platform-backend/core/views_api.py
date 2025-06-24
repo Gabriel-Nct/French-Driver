@@ -24,6 +24,9 @@ from rest_framework.exceptions import PermissionDenied
 from .models import Invoice
 from .models import Invoice
 from .serializers import InvoiceSerializer
+from django.views.decorators.csrf import csrf_exempt
+from django.utils.decorators import method_decorator
+import json
 
 
 # ===============================
@@ -420,3 +423,28 @@ def health_check(request):
         'version': '1.0.0',
         'timestamp': timezone.now()
     }, status=status.HTTP_200_OK)
+
+
+# ===============================
+# TELEGRAM
+# ===============================
+
+@method_decorator(csrf_exempt, name='dispatch')
+class TelegramWebhookView(APIView):
+    """Endpoint pour recevoir les webhooks Telegram"""
+    permission_classes = [permissions.AllowAny]
+    
+    def post(self, request):
+        try:
+            # Traiter le webhook Telegram
+            data = json.loads(request.body)
+            
+            # Ici on pourrait traiter les updates Telegram
+            # Pour l'instant, on log simplement
+            logger.info(f"Webhook Telegram reçu: {data}")
+            
+            return Response({'status': 'ok'})
+            
+        except Exception as e:
+            logger.error(f"Erreur webhook Telegram: {e}")
+            return Response({'error': str(e)}, status=400)
