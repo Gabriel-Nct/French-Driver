@@ -8,12 +8,12 @@ from decimal import Decimal
 
 
 class CustomTokenObtainPairSerializer(TokenObtainPairSerializer):
-    """Serializer personnalisé pour l'authentification JWT"""
+    """Custom Serializer for JWT Authentication"""
 
     def validate(self, attrs):
         data = super().validate(attrs)
 
-        # Ajouter des informations utilisateur au token
+        # Add user information to the token
         data.update({
             'user': {
                 'id': self.user.id,
@@ -29,7 +29,7 @@ class CustomTokenObtainPairSerializer(TokenObtainPairSerializer):
 
 
 class UserRegistrationSerializer(serializers.ModelSerializer):
-    """Serializer pour l'inscription d'un utilisateur"""
+    """Serializer for user registration"""
 
     password = serializers.CharField(write_only=True, min_length=8)
     password_confirm = serializers.CharField(write_only=True)
@@ -58,7 +58,7 @@ class UserRegistrationSerializer(serializers.ModelSerializer):
 
 
 class UserSerializer(serializers.ModelSerializer):
-    """Serializer pour les informations utilisateur"""
+    """Serializer for user information"""
 
     full_name = serializers.CharField(source='get_full_name', read_only=True)
 
@@ -72,7 +72,7 @@ class UserSerializer(serializers.ModelSerializer):
 
 
 class DriverSerializer(serializers.ModelSerializer):
-    """Serializer pour les chauffeurs"""
+    """Serializer for drivers"""
 
     vehicle_summary = serializers.CharField(
         source='get_vehicle_summary', read_only=True
@@ -88,13 +88,13 @@ class DriverSerializer(serializers.ModelSerializer):
 
 
 class BookingEstimateSerializer(serializers.Serializer):
-    """Serializer pour l'estimation de prix"""
+    """Serializer for price estimation"""
 
     pickup_address = serializers.CharField(max_length=255)
     destination_address = serializers.CharField(max_length=255)
     scheduled_time = serializers.DateTimeField()
 
-    # Coordonnées optionnelles (seront calculées si non fournies)
+    # Optional coordinates (will be calculated if not provided)
     pickup_latitude = serializers.DecimalField(
         max_digits=10, decimal_places=8, required=False
     )
@@ -109,13 +109,13 @@ class BookingEstimateSerializer(serializers.Serializer):
     )
 
     def validate(self, attrs):
-        # Pour l'instant, on accepte sans coordonnées GPS
-        # Plus tard, on intégrera le geocoding pour calculer automatiquement
+        # For now, we accept without GPS coordinates
+        # Later, we will integrate geocoding to automatically calculate
         return attrs
 
 
 class BookingCreateSerializer(serializers.ModelSerializer):
-    """Serializer pour la création de réservations"""
+    """Serializer for creating reservations"""
 
     class Meta:
         model = Booking
@@ -127,13 +127,13 @@ class BookingCreateSerializer(serializers.ModelSerializer):
         )
 
     def create(self, validated_data):
-        # Ajouter l'utilisateur connecté
+        # Add logged in user
         validated_data['user'] = self.context['request'].user
         return super().create(validated_data)
 
 
 class BookingSerializer(serializers.ModelSerializer):
-    """Serializer pour l'affichage des réservations"""
+    """Serializer for displaying reservations"""
 
     user = UserSerializer(read_only=True)
     driver = DriverSerializer(read_only=True)
@@ -158,25 +158,25 @@ class BookingSerializer(serializers.ModelSerializer):
 
 
 class BookingUpdateSerializer(serializers.ModelSerializer):
-    """Serializer pour la mise à jour des réservations (Admin)"""
+    """Serializer for updating reservations (Admin)"""
 
     class Meta:
         model = Booking
         fields = ('status', 'driver', 'final_price')
 
     def validate_status(self, value):
-        """Valider les transitions de statut autorisées"""
+        """Validate authorized status transitions"""
         if self.instance:
             current_status = self.instance.status
 
-            # Définir les transitions autorisées
+            # Define allowed transitions
             allowed_transitions = {
                 'PENDING': ['CONFIRMED', 'CANCELLED'],
                 'CONFIRMED': ['DRIVER_ASSIGNED', 'CANCELLED'],
                 'DRIVER_ASSIGNED': ['IN_PROGRESS', 'CANCELLED'],
                 'IN_PROGRESS': ['COMPLETED'],
-                'COMPLETED': [],  # Statut final
-                'CANCELLED': []   # Statut final
+                'COMPLETED': [],
+                'CANCELLED': []
             }
 
             if value not in allowed_transitions.get(current_status, []):
@@ -188,7 +188,7 @@ class BookingUpdateSerializer(serializers.ModelSerializer):
 
 
 class InvoiceSerializer(serializers.ModelSerializer):
-    """Serializer pour les factures"""
+    """Serializer for invoices"""
 
     booking = BookingSerializer(read_only=True)
 
@@ -203,9 +203,9 @@ class InvoiceSerializer(serializers.ModelSerializer):
         )
 
 
-# Serializers pour les réponses d'estimation
+# Serializers for estimation responses
 class PriceEstimateResponseSerializer(serializers.Serializer):
-    """Serializer pour la réponse d'estimation de prix"""
+    """Serializer for price estimation response"""
 
     estimated_price = serializers.DecimalField(max_digits=8, decimal_places=2)
     distance_km = serializers.FloatField()
@@ -213,15 +213,15 @@ class PriceEstimateResponseSerializer(serializers.Serializer):
     pickup_coordinates = serializers.DictField()
     destination_coordinates = serializers.DictField()
 
-    # Détails du calcul
+    # Calculation details
     base_price = serializers.FloatField()
     distance_price = serializers.FloatField()
     time_price = serializers.FloatField()
 
 
-# Serializers pour les statistiques admin
+# Serializers for admin statistics
 class AdminDashboardSerializer(serializers.Serializer):
-    """Serializer pour le dashboard administrateur"""
+    """Serializer for the admin dashboard"""
 
     total_bookings = serializers.IntegerField()
     pending_bookings = serializers.IntegerField()
@@ -234,12 +234,12 @@ class AdminDashboardSerializer(serializers.Serializer):
     total_revenue = serializers.DecimalField(max_digits=10, decimal_places=2)
     average_price = serializers.DecimalField(max_digits=8, decimal_places=2)
 
-    # Réservations récentes
+    # Recent bookings
     recent_bookings = BookingSerializer(many=True, read_only=True)
 
 
 class DispatchSerializer(serializers.Serializer):
-    """Serializer pour les actions de dispatch"""
+    """Serializer for dispatch actions"""
 
     booking_id = serializers.IntegerField()
     driver_id = serializers.IntegerField(required=False)

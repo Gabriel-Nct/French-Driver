@@ -9,33 +9,34 @@ from .models import Booking, Driver, Invoice
 import asyncio
 from .telegram_service import telegram_service
 
+
 class PricingService:
     """
-    Service pour le calcul des prix et distances
+    Service for calculating prices and distances
     """
 
-    # Tarifs de base
-    BASE_PRICE = Decimal('5.00')  # Prix de prise en charge
-    PRICE_PER_KM = Decimal('1.50')  # Prix par kilomètre
-    PRICE_PER_MINUTE = Decimal('0.30')  # Prix par minute
+    # Basic rates
+    BASE_PRICE = Decimal('5.00')  # Support price
+    PRICE_PER_KM = Decimal('1.50')  # Price per kilometer
+    PRICE_PER_MINUTE = Decimal('0.30')  # Price per minute
 
     @staticmethod
     def calculate_distance(lat1: float, lon1: float, lat2: float, lon2: float) -> float:
         """
-        Calcule la distance entre deux points GPS
-        en utilisant la formule de Haversine.
-        Retourne la distance en kilomètres
+        Calculates the distance between two GPS points
+        using the Haversine formula.
+        Returns the distance in kilometers
         """
-        # Conversion en radians
+        # Conversion to radians
         lat1, lon1, lat2, lon2 = map(math.radians, [lat1, lon1, lat2, lon2])
 
-        # Formule de Haversine
+        # Haversine formula
         dlat = lat2 - lat1
         dlon = lon2 - lon1
         a = math.sin(dlat/2)**2 + math.cos(lat1) * math.cos(lat2) * math.sin(dlon/2)**2
         c = 2 * math.asin(math.sqrt(a))
 
-        # Rayon de la Terre en kilomètres
+        # Radius of the Earth in kilometers
         r = 6371
 
         return c * r
@@ -43,26 +44,26 @@ class PricingService:
     @staticmethod
     def estimate_duration(distance_km: float) -> int:
         """
-        Estime la durée du trajet en minutes
-        Suppose une vitesse moyenne de 30 km/h en ville
+        Estimate the journey time in minutes
+        Assumes an average speed of 30 km/h in the city
         """
         avg_speed_kmh = 30
         duration_hours = distance_km / avg_speed_kmh
-        return int(duration_hours * 60)  # Conversion en minutes
+        return int(duration_hours * 60)  # Conversion to minutes
 
     @classmethod
     def calculate_price(cls, pickup_lat: float, pickup_lon: float, dest_lat: float, dest_lon: float) -> dict:
         """
-        Calcule le prix estimé d'une course
-        Retourne un dictionnaire avec les détails du calcul
+        Calculates the estimated price of a ride
+        Returns a dictionary with the details of the calculation
         """
-        # Calcul de la distance
+        # Calculating the distance
         distance_km = cls.calculate_distance(pickup_lat, pickup_lon, dest_lat, dest_lon)
 
-        # Estimation de la durée
+        # Estimated duration
         duration_minutes = cls.estimate_duration(distance_km)
 
-        # Calcul du prix
+        # Price calculation
         distance_price = Decimal(str(distance_km)) * cls.PRICE_PER_KM
         time_price = Decimal(str(duration_minutes)) * cls.PRICE_PER_MINUTE
         total_price = cls.BASE_PRICE + distance_price + time_price
@@ -79,13 +80,13 @@ class PricingService:
 
 class NotificationService:
     """
-    Service pour l'envoi de notifications par email
+    Service for sending email notifications
     """
 
     @staticmethod
     def send_booking_confirmation(booking: Booking) -> bool:
         """
-        Envoie un email de confirmation de réservation au client
+        Sends a booking confirmation email to the customer
         """
         try:
             subject = f"Confirmation de votre réservation VTC #{booking.confirmation_number}"
@@ -127,7 +128,7 @@ class NotificationService:
     @staticmethod
     def send_driver_assignment(booking: Booking) -> bool:
         """
-        Envoie un email d'assignation de chauffeur au client
+        Sends a driver assignment email to the customer
         """
         if not booking.driver:
             return False
@@ -173,11 +174,11 @@ class NotificationService:
     @staticmethod
     def notify_driver_new_booking(driver: Driver, booking: Booking) -> bool:
         """
-        Notifie un chauffeur d'une nouvelle course disponible
+        Notifies a driver of a new available ride
         """
         try:
             subject = f"Nouvelle course disponible - {booking.pickup_address}"
-            
+
             message = f"""
             Bonjour {driver.name},
 
@@ -195,7 +196,7 @@ class NotificationService:
             Cordialement,
             L'équipe French Driver
             """
-            
+
             send_mail(
                 subject=subject,
                 message=message,
@@ -203,13 +204,13 @@ class NotificationService:
                 recipient_list=[driver.email],
                 fail_silently=False,
             )
-            
+
             success_email = True
-            
+
         except Exception as e:
             print(f"Erreur lors de l'envoi de l'email au chauffeur : {e}")
-        
-        # 2. Notification par Telegram
+
+        # 2. Notification by Telegram
         if driver.can_receive_notifications():
             try:
                 telegram_message = f"""
@@ -229,24 +230,24 @@ class NotificationService:
 
                 success_telegram = response.json().get("ok", False)
 
-
             except Exception as e:
                 print(f"Erreur lors de l'envoi de la notification Telegram : {e}")
-        
+
         return success_email or success_telegram
+
 
 class DispatchService:
     """
-    Service pour la gestion du dispatch des courses
+    Service for managing race dispatch
     """
 
     @staticmethod
     def broadcast_to_available_drivers(booking: Booking) -> dict:
         """
-        Diffuse une course à tous les chauffeurs disponibles
-        Retourne un rapport de diffusion
+        Broadcast a ride to all available drivers
+        Returns a broadcast report
         """
-        # Pour l'instant, tous les chauffeurs
+        # For now, all drivers
         available_drivers = Driver.objects.all()
 
         success_count = 0
@@ -272,12 +273,12 @@ class DispatchService:
     @staticmethod
     def assign_driver_to_booking(booking: Booking, driver: Driver) -> bool:
         """
-        Assigne manuellement un chauffeur à une réservation
+        Manually assign a driver to a reservation
         """
         try:
             booking.assign_driver(driver)
 
-            # Envoyer les notifications
+            # Send notifications
             NotificationService.send_driver_assignment(booking)
 
             return True
@@ -289,7 +290,7 @@ class DispatchService:
 
 class InvoiceService:
     """
-    Service pour la gestion des factures
+    Service for invoice management
     """
 
     @staticmethod
@@ -301,15 +302,15 @@ class InvoiceService:
             return None
 
         try:
-            # Vérifier si une facture existe déjà
+            # Check if an invoice already exists
             if hasattr(booking, 'invoice'):
                 return booking.invoice
 
-            # Créer la facture
+            # Create the invoice
             invoice = Invoice.objects.create(
                 booking=booking,
                 amount=booking.final_price or booking.estimated_price,
-                tax_amount=Decimal('0.00'),  # Pas de TVA pour l'instant
+                tax_amount=Decimal('0.00'),  # No VAT for now
             )
 
             return invoice

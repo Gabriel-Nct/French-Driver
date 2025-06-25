@@ -25,7 +25,7 @@ urlpatterns = [
         name='user_profile'
         ),
 
-    # Réservations
+    # Booking
     path(
         'bookings/estimate/', views_api.BookingEstimateView.as_view(),
         name='booking_estimate'
@@ -58,7 +58,7 @@ urlpatterns = [
         name='dispatch'
         ),
 
-    # Chauffeurs
+    # Drivers
     path(
         'drivers/', views_api.DriverListView.as_view(),
         name='driver_list'

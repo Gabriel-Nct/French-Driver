@@ -9,7 +9,7 @@ from rest_framework import status
 @permission_classes([AllowAny])
 def health_check(request):
     """
-    Vue simple pour vérifier que l'API fonctionne
+    Simple view to verify that the API is working
     """
     return Response({
         'success': True,

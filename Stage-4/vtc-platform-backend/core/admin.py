@@ -5,7 +5,7 @@ from .models import User, Driver, Booking, Invoice
 
 
 class CustomUserCreationForm(UserCreationForm):
-    """Formulaire de création d'utilisateur personnalisé"""
+    """Custom user creation form"""
 
     class Meta:
         model = User
@@ -16,7 +16,7 @@ class CustomUserCreationForm(UserCreationForm):
 
 
 class CustomUserChangeForm(UserChangeForm):
-    """Formulaire de modification d'utilisateur personnalisé"""
+    """Custom User Edit Form"""
 
     class Meta:
         model = User
@@ -28,12 +28,12 @@ class CustomUserChangeForm(UserChangeForm):
 
 @admin.register(User)
 class UserAdmin(BaseUserAdmin):
-    """Administration personnalisée pour le modèle User"""
+    """Custom administration for the User model"""
 
     form = CustomUserChangeForm
     add_form = CustomUserCreationForm
 
-    # Champs affichés dans la liste
+    # Fields displayed in the list
     list_display = (
         'username', 'email', 'first_name', 'last_name',
         'user_type', 'is_active', 'created_at'
@@ -44,14 +44,14 @@ class UserAdmin(BaseUserAdmin):
         'last_name', 'phone_number'
         )
 
-    # Configuration des fieldsets pour l'édition
+    # Configuring fieldsets for editing
     fieldsets = BaseUserAdmin.fieldsets + (
         ('Informations personnalisées', {
             'fields': ('phone_number', 'user_type', 'created_at', 'updated_at')
         }),
     )
 
-    # Configuration des fieldsets pour l'ajout
+    # Configuring fieldsets for adding
     add_fieldsets = BaseUserAdmin.add_fieldsets + (
         ('Informations personnalisées', {
             'fields': (
@@ -66,19 +66,19 @@ class UserAdmin(BaseUserAdmin):
 
 @admin.register(Driver)
 class DriverAdmin(admin.ModelAdmin):
-    """Administration pour le modèle Driver"""
+    """Administration for the Driver model"""
 
     list_display = (
-        'name', 'email', 'phone_number', 'license_number', 
+        'name', 'email', 'phone_number', 'license_number',
         'has_telegram', 'notifications_enabled', 'created_at'
     )
     list_filter = ('notifications_enabled', 'created_at')
     search_fields = (
-        'name', 'email', 'phone_number', 'license_number', 
+        'name', 'email', 'phone_number', 'license_number',
         'telegram_username', 'telegram_chat_id'
     )
     readonly_fields = ('created_at',)
-    
+
     fieldsets = (
         ('Informations personnelles', {
             'fields': ('name', 'email', 'phone_number')
@@ -88,7 +88,7 @@ class DriverAdmin(admin.ModelAdmin):
         }),
         ('Configuration Telegram', {
             'fields': (
-                'telegram_chat_id', 'telegram_username', 
+                'telegram_chat_id', 'telegram_username',
                 'notifications_enabled'
             ),
             'description': 'Le chauffeur doit utiliser /start sur le bot pour obtenir son Chat ID'
@@ -98,22 +98,22 @@ class DriverAdmin(admin.ModelAdmin):
             'classes': ('collapse',)
         }),
     )
-    
+
     def has_telegram(self, obj):
-        """Indique si le chauffeur a configuré Telegram"""
+        """Indicates if the driver has configured Telegram"""
         return obj.has_telegram()
     has_telegram.boolean = True
     has_telegram.short_description = 'Telegram configuré'
 
     def get_vehicle_summary(self, obj):
-        """Affiche un résumé du véhicule dans l'admin"""
+        """Displays a vehicle summary in the admin"""
         return obj.get_vehicle_summary()
     get_vehicle_summary.short_description = 'Véhicule (résumé)'
 
 
 @admin.register(Booking)
 class BookingAdmin(admin.ModelAdmin):
-    """Administration pour le modèle Booking"""
+    """Administration for the Booking model"""
 
     list_display = (
         'id', 'confirmation_number', 'user', 'driver', 'status',
@@ -149,13 +149,13 @@ class BookingAdmin(admin.ModelAdmin):
     )
 
     def get_queryset(self, request):
-        """Optimise les requêtes avec select_related"""
+        """Optimize queries with select_related"""
         return super().get_queryset(request).select_related('user', 'driver')
 
 
 @admin.register(Invoice)
 class InvoiceAdmin(admin.ModelAdmin):
-    """Administration pour le modèle Invoice"""
+    """Administration for the Invoice template"""
 
     list_display = (
         'invoice_number', 'booking', 'amount', 'tax_amount',

@@ -72,7 +72,7 @@ TEMPLATES = [
 
 WSGI_APPLICATION = 'vtc_platform.wsgi.application'
 
-# Database (pour l'instant SQLite, on passera à PostgreSQL plus tard)
+# Database
 DATABASES = {
     'default': {
         'ENGINE': 'django.db.backends.mysql',
@@ -85,8 +85,8 @@ DATABASES = {
             'charset': 'utf8mb4',
             'use_unicode': True,
             'init_command': "SET sql_mode='STRICT_TRANS_TABLES'",
-    }
-}
+            }
+            }
 }
 
 # REST Framework configuration
@@ -137,7 +137,7 @@ SIMPLE_JWT = {
 
 # CORS Configuration
 CORS_ALLOWED_ORIGINS = [
-    "http://localhost:3000",  # Pour React en développement
+    "http://localhost:3000",
     "http://127.0.0.1:3000",
 ]
 
@@ -158,16 +158,16 @@ DEFAULT_AUTO_FIELD = 'django.db.models.BigAutoField'
 AUTH_USER_MODEL = 'core.User'
 
 
-# Pour production avec Gmail:
+# For production with Gmail:
 # settings.py  –  section email
-EMAIL_BACKEND   = "django.core.mail.backends.smtp.EmailBackend"
-EMAIL_HOST      = "smtp.gmail.com"
-EMAIL_PORT      = 587           # 587 = StartTLS
-EMAIL_USE_TLS   = True          # Active TLS explicite
-EMAIL_USE_SSL   = False         # Désactive SSL implicite
-# Ne PAS définir EMAIL_SSL_CERTFILE / KEYFILE
+EMAIL_BACKEND = "django.core.mail.backends.smtp.EmailBackend"
+EMAIL_HOST = "smtp.gmail.com"
+EMAIL_PORT = 587           # 587 = StartTLS
+EMAIL_USE_TLS = True          # Enable explicit TLS
+EMAIL_USE_SSL = False         # Disables implicit SSL
+# Do NOT set EMAIL_SSL_CERTFILE / KEYFILE
 EMAIL_HOST_USER = config("EMAIL_HOST_USER")       # bookfrenchdriver@gmail.com
-EMAIL_HOST_PASSWORD = config("EMAIL_HOST_PASSWORD")  # votre mot de passe d’application
+EMAIL_HOST_PASSWORD = config("EMAIL_HOST_PASSWORD")  # application password
 DEFAULT_FROM_EMAIL = EMAIL_HOST_USER
 
 # Telegram Bot Configuration

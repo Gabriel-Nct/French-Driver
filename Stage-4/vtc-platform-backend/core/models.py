@@ -7,8 +7,8 @@ from django.utils import timezone
 
 class User(AbstractUser):
     """
-    Modèle User étendu pour la plateforme VTC
-    Hérite d'AbstractUser pour garder toutes les fonctionnalités de base
+    Extended User Model for the VTC platform
+    Inherits from AbstractUser to keep all basic functionality
     """
 
     USER_TYPE_CHOICES = [
@@ -16,14 +16,14 @@ class User(AbstractUser):
         ('ADMIN', 'Administrateur'),
     ]
 
-    # Validation du numéro de téléphone (format français/international)
+    # Phone number validation (French/international format)
     phone_regex = RegexValidator(
         regex=r'^\+?1?\d{9,15}$',
         message="Le numéro de téléphone doit être au format: '+999999999'."
         " 9 à 15 chiffres autorisés."
     )
 
-    # Champs additionnels
+    # Additional fields
     phone_number = models.CharField(
         validators=[phone_regex],
         max_length=17,
@@ -39,9 +39,9 @@ class User(AbstractUser):
         help_text="Type d'utilisateur"
     )
 
-    # Timestamps automatiques
+    # Automatic timestamps
     created_at = models.DateTimeField(auto_now_add=True)
-    updated_at   = models.DateTimeField(auto_now=True) #rajout 
+    updated_at = models.DateTimeField(auto_now=True)
     updated_at = models.DateTimeField(auto_now=True)
 
     class Meta:
@@ -53,21 +53,21 @@ class User(AbstractUser):
         return f"{self.username} ({self.get_user_type_display()})"
 
     def get_full_name(self):
-        """Retourne le nom complet de l'utilisateur"""
+        """Returns the user's full name"""
         return f"{self.first_name} {self.last_name}".strip()
 
     def is_client(self):
-        """Vérifie si l'utilisateur est un client"""
+        """Checks if the user is a client"""
         return self.user_type == 'CLIENT'
 
     def is_admin_user(self):
-        """Vérifie si l'utilisateur est un administrateur"""
+        """Checks if the user is an administrator"""
         return self.user_type == 'ADMIN'
 
 
 class Driver(models.Model):
     """
-    Modèle Driver pour les chauffeurs VTC
+    Driver Model for VTC drivers
     """
 
     name = models.CharField(
@@ -110,56 +110,56 @@ class Driver(models.Model):
         null=True,
         help_text="Chat ID Telegram du chauffeur pour les notifications"
     )
-    
+
     telegram_username = models.CharField(
         max_length=100,
         blank=True,
         null=True,
         help_text="Username Telegram du chauffeur (optionnel)"
     )
-    
-    # Paramètres de notification
+
+    # Notification settings
     notifications_enabled = models.BooleanField(
         default=True,
         help_text="Le chauffeur souhaite-t-il recevoir des notifications ?"
     )
-    
-    # Timestamp de création
+
+    # Creation timestamp
     created_at = models.DateTimeField(auto_now_add=True)
-    
+
     class Meta:
         db_table = 'drivers'
         verbose_name = 'Chauffeur'
         verbose_name_plural = 'Chauffeurs'
         ordering = ['name']
-    
+
     def __str__(self):
         return f"{self.name} - {self.license_number}"
-    
+
     @property
     def display_phone(self):
-        """Affiche le numéro de téléphone de manière formatée"""
+        """Displays the phone number in a formatted manner"""
         return self.phone_number
-    
+
     def get_vehicle_summary(self):
-        """Retourne un résumé du véhicule (premiers 50 caractères)"""
+        """Returns a vehicle summary (first 50 characters)"""
         if len(self.vehicle_info) > 50:
             return self.vehicle_info[:50] + "..."
         else:
             return self.vehicle_info
-    
+
     def has_telegram(self):
-        """Vérifie si le chauffeur a configuré Telegram"""
+        """Check if the driver has configured Telegram"""
         return bool(self.telegram_chat_id)
-    
+
     def can_receive_notifications(self):
-        """Vérifie si le chauffeur peut recevoir des notifications"""
+        """Check if the driver can receive notifications"""
         return self.notifications_enabled and self.has_telegram()
 
 
 class Booking(models.Model):
     """
-    Modèle Booking pour les réservations VTC
+    Booking template for VTC reservations
     """
 
     BOOKING_STATUS_CHOICES = [
@@ -171,7 +171,7 @@ class Booking(models.Model):
         ('CANCELLED', 'Annulée'),
     ]
 
-    # Relations
+    # Relationships
     user = models.ForeignKey(
         'User',
         on_delete=models.CASCADE,
@@ -188,7 +188,7 @@ class Booking(models.Model):
         help_text="Chauffeur assigné à la course"
     )
 
-    # Adresses et coordonnées de départ
+    # Departure addresses and coordinates
     pickup_address = models.CharField(
         max_length=255,
         help_text="Adresse de départ"
@@ -206,7 +206,7 @@ class Booking(models.Model):
         help_text="Longitude du point de départ"
     )
 
-    # Adresses et coordonnées de destination
+    # Destination addresses and coordinates
     destination_address = models.CharField(
         max_length=255,
         help_text="Adresse de destination"
@@ -224,7 +224,7 @@ class Booking(models.Model):
         help_text="Longitude du point de destination"
     )
 
-    # Prix et tarification
+    # Prices and pricing
     estimated_price = models.DecimalField(
         max_digits=8,
         decimal_places=2,
@@ -240,7 +240,7 @@ class Booking(models.Model):
         " Pour l'instant égal à l'estimated_price."
     )
 
-    # Statut et planification
+    # Status and planning
     status = models.CharField(
         max_length=20,
         choices=BOOKING_STATUS_CHOICES,
@@ -271,30 +271,30 @@ class Booking(models.Model):
         return f"Réservation #{self.id} - {self.user.username} - {self.get_status_display()}"
 
     def save(self, *args, **kwargs):
-        """Override save pour définir final_price si non défini"""
+        """Override save to set final_price if not set"""
         if self.final_price is None:
             self.final_price = self.estimated_price
         super().save(*args, **kwargs)
 
     @property
     def confirmation_number(self):
-        """Génère un numéro de confirmation unique"""
+        """Generates a unique confirmation number"""
         return f"VTC{self.id:06d}"
 
     def assign_driver(self, driver):
-        """Assigne un chauffeur à la réservation"""
+        """Assign a driver to the reservation"""
         self.driver = driver
         self.status = 'DRIVER_ASSIGNED'
         self.save()
 
     def start_trip(self):
-        """Démarre la course"""
+        """Start the race"""
         if self.status == 'DRIVER_ASSIGNED':
             self.status = 'IN_PROGRESS'
             self.save()
 
     def complete_trip(self, final_price=None):
-        """Termine la course"""
+        """Finish the race"""
         if self.status == 'IN_PROGRESS':
             self.status = 'COMPLETED'
             self.completed_at = timezone.now()
@@ -303,34 +303,34 @@ class Booking(models.Model):
             self.save()
 
     def cancel(self):
-        """Annule la réservation"""
+        """Cancel the reservation"""
         if self.status in ['PENDING', 'CONFIRMED', 'DRIVER_ASSIGNED']:
             self.status = 'CANCELLED'
             self.save()
 
     def get_distance_display(self):
         """
-        Calcule et affiche la distance
-        (à implémenter avec le service de calcul)
+        Calculates and displays distance
+        (to be implemented with the calculation service)
         """
         # Placeholder - sera implémenté avec PricingService
         return "À calculer"
 
     def is_active(self):
-        """Vérifie si la réservation est active"""
+        """Check if the reservation is active"""
         return self.status in [
             'PENDING', 'CONFIRMED',
             'DRIVER_ASSIGNED', 'IN_PROGRESS'
             ]
 
     def can_be_cancelled(self):
-        """Vérifie si la réservation peut être annulée"""
+        """Check if the reservation can be cancelled"""
         return self.status in ['PENDING', 'CONFIRMED', 'DRIVER_ASSIGNED']
 
 
 class Invoice(models.Model):
     """
-    Modèle Invoice pour les factures
+    Invoice template for invoices
     """
 
     INVOICE_STATUS_CHOICES = [
@@ -397,10 +397,10 @@ class Invoice(models.Model):
 
     def save(self, *args, **kwargs):
         """
-        Override save pour générer le numéro de facture et calculer le total
+        Override save to generate invoice number and calculate total
         """
         if not self.invoice_number:
-            # Générer un numéro de facture unique
+            # Generate a unique invoice number
             year = timezone.now().year
             month = timezone.now().month
             count = Invoice.objects.filter(
@@ -409,7 +409,7 @@ class Invoice(models.Model):
             ).count() + 1
             self.invoice_number = f"VTC-{year}-{month:02d}-{count:04d}"
 
-        # Calculer le montant total
+        # Calculate the total amount
         self.total_amount = self.amount + self.tax_amount
 
         super().save(*args, **kwargs)
