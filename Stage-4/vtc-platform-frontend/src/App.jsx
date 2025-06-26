@@ -2,9 +2,13 @@
 import { Routes, Route } from "react-router-dom";
 import Navbar from "./components/Navbar";
 import HomePage from "./pages/HomePage";
-import BookingPage from "./pages/BookingPage";
-import Dashboard from "./pages/Dashboard";
 import 'leaflet/dist/leaflet.css';
+import LoginPage from "./pages/LoginPage";
+import RegisterPage from "./pages/RegisterPage";
+import LoginPageAdmin from "./pages/LoginPageAdmin";
+import CustomerPage, { mockClient } from "./pages/CustomerPage.jsx";
+import AdminDashboard from "./pages/AdminDashboard";
+
 
 
 export default function App() {
@@ -14,8 +18,11 @@ export default function App() {
       <div className="p-4">
         <Routes>
           <Route path="/" element={<HomePage />} />
-          <Route path="/booking" element={<BookingPage />} />
-          <Route path="/dashboard" element={<Dashboard />} />
+          <Route path="/login" element={<LoginPage />} />
+          <Route path="/register" element={<RegisterPage />} />
+          <Route path="/admin/login" element={<LoginPageAdmin />} />
+          <Route path="/customer/:id" element={<CustomerPage client={mockClient} />} />
+          <Route path="/admin/dashboard" element={<AdminDashboard />} />
         </Routes>
       </div>
     </>
