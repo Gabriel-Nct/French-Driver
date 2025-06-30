@@ -94,6 +94,10 @@ class BookingEstimateSerializer(serializers.Serializer):
     destination_address = serializers.CharField(max_length=255)
     scheduled_time = serializers.DateTimeField()
 
+    vehicle_type = serializers.ChoiceField(
+        choices=['eco', 'berline', 'van', 'goldwing'], default='eco'
+    )
+
     # Optional coordinates (will be calculated if not provided)
     pickup_latitude = serializers.DecimalField(
         max_digits=10, decimal_places=8, required=False
@@ -110,7 +114,6 @@ class BookingEstimateSerializer(serializers.Serializer):
 
     def validate(self, attrs):
         # For now, we accept without GPS coordinates
-        # Later, we will integrate geocoding to automatically calculate
         return attrs
 
 

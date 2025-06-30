@@ -80,41 +80,34 @@ class BookingEstimateView(APIView):
         serializer = BookingEstimateSerializer(data=request.data)
         serializer.is_valid(raise_exception=True)
 
-        # for now, use default coordinates if not provided
-        pickup_lat = float(
-            serializer.validated_data.get('pickup_latitude', 48.8566)
-            )
-        pickup_lon = float(
-            serializer.validated_data.get('pickup_longitude', 2.3522)
-            )
-        dest_lat = float(
-            serializer.validated_data.get('destination_latitude', 49.0097)
-            )
-        dest_lon = float(
-            serializer.validated_data.get('destination_longitude', 2.5479)
-            )
+        # Coordonnées (fallback si absentes)
+        pickup_lat = float(serializer.validated_data.get("pickup_latitude", 48.8566))
+        pickup_lon = float(serializer.validated_data.get("pickup_longitude", 2.3522))
+        dest_lat   = float(serializer.validated_data.get("destination_latitude", 49.0097))
+        dest_lon   = float(serializer.validated_data.get("destination_longitude", 2.5479))
 
-        # Price calculation
+        # Type de véhicule (eco par défaut)
+        vehicle_type = serializer.validated_data.get("vehicle_type", "eco")
+
+        # Calcul du prix avec tarifs dynamiques
         pricing_result = PricingService.calculate_price(
-            pickup_lat, pickup_lon, dest_lat, dest_lon
+            pickup_lat, pickup_lon, dest_lat, dest_lon, vehicle_type
         )
 
-        # Add coordinates to the answer
-        pricing_result['pickup_coordinates'] = {
-            'latitude': pickup_lat,
-            'longitude': pickup_lon
+        # Ajoute les coordonnées dans la réponse
+        pricing_result["pickup_coordinates"] = {
+            "latitude": pickup_lat,
+            "longitude": pickup_lon,
         }
-        pricing_result['destination_coordinates'] = {
-            'latitude': dest_lat,
-            'longitude': dest_lon
+        pricing_result["destination_coordinates"] = {
+            "latitude": dest_lat,
+            "longitude": dest_lon,
         }
 
-        return Response({
-            'success': True,
-            'data': pricing_result
-        })
-
-
+        return Response(
+            {"success": True, "data": pricing_result},
+            status=status.HTTP_200_OK,
+        )
 class BookingCreateView(generics.CreateAPIView):
     """View to create a reservation"""
     queryset = Booking.objects.all()

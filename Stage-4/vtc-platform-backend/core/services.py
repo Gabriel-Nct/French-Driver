@@ -8,74 +8,82 @@ from django.template.loader import render_to_string
 from .models import Booking, Driver, Invoice
 import asyncio
 from .telegram_service import telegram_service
+from django.db import transaction, IntegrityError
+from django.utils import timezone
 
 
 class PricingService:
     """
-    Service for calculating prices and distances
+    Service for calculating distances and ride prices
     """
 
-    # Basic rates
-    BASE_PRICE = Decimal('5.00')  # Support price
-    PRICE_PER_KM = Decimal('1.50')  # Price per kilometer
-    PRICE_PER_MINUTE = Decimal('0.30')  # Price per minute
+    # Tarifs par type de véhicule
+    VEHICLE_TARIFFS = {
+        "eco":      {"base": Decimal("5.00"), "per_km": Decimal("1.50"), "per_min": Decimal("0.40")},
+        "berline":  {"base": Decimal("7.00"), "per_km": Decimal("1.80"), "per_min": Decimal("0.45")},
+        "van":      {"base": Decimal("8.00"), "per_km": Decimal("2.00"), "per_min": Decimal("0.50")},
+        "goldwing": {"base": Decimal("8.00"), "per_km": Decimal("2.00"), "per_min": Decimal("0.50")},
+    }
 
+    # ————————————————————————————————————————————————
+    # 1️⃣  Distance & durée
+    # ————————————————————————————————————————————————
     @staticmethod
     def calculate_distance(lat1: float, lon1: float, lat2: float, lon2: float) -> float:
         """
-        Calculates the distance between two GPS points
-        using the Haversine formula.
-        Returns the distance in kilometers
+        Distance (km) entre deux points GPS (Haversine)
         """
-        # Conversion to radians
         lat1, lon1, lat2, lon2 = map(math.radians, [lat1, lon1, lat2, lon2])
-
-        # Haversine formula
-        dlat = lat2 - lat1
-        dlon = lon2 - lon1
-        a = math.sin(dlat/2)**2 + math.cos(lat1) * math.cos(lat2) * math.sin(dlon/2)**2
+        dlat, dlon = lat2 - lat1, lon2 - lon1
+        a = math.sin(dlat / 2) ** 2 + math.cos(lat1) * math.cos(lat2) * math.sin(dlon / 2) ** 2
         c = 2 * math.asin(math.sqrt(a))
-
-        # Radius of the Earth in kilometers
-        r = 6371
-
-        return c * r
+        return 6371 * c  # Rayon moyen de la Terre (km)
 
     @staticmethod
     def estimate_duration(distance_km: float) -> int:
         """
-        Estimate the journey time in minutes
-        Assumes an average speed of 30 km/h in the city
+        Durée estimée (minutes) à 30 km/h de moyenne
         """
-        avg_speed_kmh = 30
-        duration_hours = distance_km / avg_speed_kmh
-        return int(duration_hours * 60)  # Conversion to minutes
+        return int((distance_km / 30) * 60)
 
+    # ————————————————————————————————————————————————
+    # 2️⃣  Prix
+    # ————————————————————————————————————————————————
     @classmethod
-    def calculate_price(cls, pickup_lat: float, pickup_lon: float, dest_lat: float, dest_lon: float) -> dict:
+    def calculate_price(
+        cls,
+        pickup_lat: float,
+        pickup_lon: float,
+        dest_lat: float,
+        dest_lon: float,
+        vehicle_type: str = "eco",
+    ) -> dict:
         """
-        Calculates the estimated price of a ride
-        Returns a dictionary with the details of the calculation
+        Estime le prix d’une course selon le type de véhicule
         """
-        # Calculating the distance
+        # a. Tarifs applicables
+        tariffs = cls.VEHICLE_TARIFFS.get(vehicle_type, cls.VEHICLE_TARIFFS["eco"])
+        base_price, per_km, per_min = tariffs["base"], tariffs["per_km"], tariffs["per_min"]
+
+        # b. Distance & durée
         distance_km = cls.calculate_distance(pickup_lat, pickup_lon, dest_lat, dest_lon)
+        duration_min = cls.estimate_duration(distance_km)
 
-        # Estimated duration
-        duration_minutes = cls.estimate_duration(distance_km)
+        # c. Calcul
+        distance_price = Decimal(str(distance_km)) * per_km
+        time_price = Decimal(str(duration_min)) * per_min
+        total_price = base_price + distance_price + time_price
 
-        # Price calculation
-        distance_price = Decimal(str(distance_km)) * cls.PRICE_PER_KM
-        time_price = Decimal(str(duration_minutes)) * cls.PRICE_PER_MINUTE
-        total_price = cls.BASE_PRICE + distance_price + time_price
-
+        # d. Résultat détaillé
         return {
-            'distance_km': round(distance_km, 2),
-            'estimated_duration_minutes': duration_minutes,
-            'base_price': float(cls.BASE_PRICE),
-            'distance_price': float(distance_price),
-            'time_price': float(time_price),
-            'estimated_price': float(total_price.quantize(Decimal('0.01')))
+            "distance_km": round(distance_km, 2),
+            "estimated_duration_minutes": duration_min,
+            "base_price": float(base_price),
+            "distance_price": float(distance_price),
+            "time_price": float(time_price),
+            "estimated_price": float(total_price.quantize(Decimal("0.01"))),
         }
+
 
 
 class NotificationService:
@@ -293,28 +301,62 @@ class InvoiceService:
     Service for invoice management
     """
 
+    # ---------- 1. Génération thread-safe du numéro ----------
     @staticmethod
-    def generate_invoice(booking: Booking) -> Optional[Invoice]:
+    def _next_invoice_number() -> str:
         """
-        Génère une facture pour une réservation terminée
+        Retourne le prochain numéro VTC-YYYY-MM-XXXX sans collision,
+        en verrouillant les factures du mois courant.
         """
-        if booking.status != 'COMPLETED':
-            return None
+        now = timezone.now()
+        prefix = f"VTC-{now:%Y-%m}-"
 
-        try:
-            # Check if an invoice already exists
-            if hasattr(booking, 'invoice'):
-                return booking.invoice
-
-            # Create the invoice
-            invoice = Invoice.objects.create(
-                booking=booking,
-                amount=booking.final_price or booking.estimated_price,
-                tax_amount=Decimal('0.00'),  # No VAT for now
+        with transaction.atomic():                         # ➜ ouvre une transaction SQL
+            last = (
+                Invoice.objects
+                .select_for_update()                       # ➜ lock les lignes du mois
+                .filter(invoice_number__startswith=prefix)
+                .order_by("-invoice_number")
+                .first()
             )
 
-            return invoice
+            seq = 1
+            if last:                                       # ex : 'VTC-2025-06-0012'
+                seq = int(last.invoice_number[-4:]) + 1    #       -> 12 + 1 = 13
 
-        except Exception as e:
-            print(f"Erreur lors de la génération de la facture : {e}")
+            return f"{prefix}{seq:04d}"                    # 'VTC-2025-06-0013'
+
+    # ---------- 2. Création “retry” en cas de collision ----------
+    @classmethod
+    def _create_unique_invoice(cls, booking: Booking) -> Invoice:
+        """
+        Tente de créer une facture ; ré-essaie si l’unicité échoue (rare).
+        """
+        while True:
+            try:
+                return Invoice.objects.create(
+                    booking=booking,
+                    invoice_number=cls._next_invoice_number(),
+                    amount=booking.final_price or booking.estimated_price,
+                    tax_amount=Decimal("0.00"),
+                )
+            except IntegrityError:
+                # Une autre transaction a inséré le même numéro
+                # juste avant le commit → on relance la boucle
+                continue
+
+    # ---------- 3. API publique ----------
+    @classmethod
+    def generate_invoice(cls, booking: Booking) -> Optional[Invoice]:
+        """
+        Génère (ou renvoie) la facture liée à une réservation complétée.
+        """
+        if booking.status != "COMPLETED":
             return None
+
+        # a/ si elle existe déjà → on la renvoie
+        if hasattr(booking, "invoice"):
+            return booking.invoice
+
+        # b/ sinon on la crée de façon sûre
+        return cls._create_unique_invoice(booking)
