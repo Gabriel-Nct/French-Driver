@@ -1,5 +1,5 @@
 import React, { useState } from "react";
-import { Link } from "react-router-dom";
+import { Link, useNavigate } from "react-router-dom";
 import {
   Card,
   CardContent,
@@ -17,8 +17,9 @@ export default function RegisterPage() {
   const [password, setPassword] = useState("");
   const [confirmPassword, setConfirmPassword] = useState("");
   const [error, setError] = useState("");
+  const navigate = useNavigate();
 
-  const handleSubmit = (e) => {
+  const handleSubmit = async (e) => {
     e.preventDefault();
     if (password !== confirmPassword) {
       setError("Les mots de passe ne correspondent pas.");
@@ -26,9 +27,35 @@ export default function RegisterPage() {
     }
 
     setError("");
-    // TODO: envoyer les données au back ici
-    console.log({ firstName, lastName, email, phone, password });
-    alert("Compte créé avec succès !");
+    try {
+      const response = await fetch("/api/auth/register/", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          username: email,        // Utiliser l'email comme username
+          password: password,
+          password_confirm: confirmPassword,
+          first_name: firstName,
+          last_name: lastName,
+          email: email,
+          phone_number: phone,
+        }),
+      });
+
+      if (!response.ok) {
+        const data = await response.json();
+        console.error("Errors:", data);
+        const message = data.detail || Object.values(data).flat().join(" ") || "Erreur lors de l'inscription.";
+        setError(message);
+        return;
+      }
+
+      // Inscription réussie
+      alert("Compte créé avec succès !");
+      navigate("/login");
+    } catch (err) {
+      setError(err.message || "Erreur réseau.");
+    }
   };
 
   return (

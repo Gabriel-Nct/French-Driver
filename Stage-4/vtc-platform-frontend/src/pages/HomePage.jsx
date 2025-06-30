@@ -1,116 +1,90 @@
-import { useState, useEffect, useRef } from "react"
+/* =======================  HomePage.jsx  ======================= */
+import { useState, useEffect, useRef, useCallback } from "react";
+import { useNavigate } from "react-router-dom";
 import {
-  Card,
-  CardHeader,
-  CardTitle,
-  CardContent,
-} from "@/components/ui/card"
-import { Input } from "@/components/ui/input"
-import { Button } from "@/components/ui/button"
-import { Label } from "@/components/ui/label"
-import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group"
-import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover"
-import { Calendar } from "@/components/ui/calendar"
-import { format } from "date-fns"
-import { CalendarIcon } from "lucide-react"
-import { cn } from "@/lib/utils"
+  Card, CardHeader, CardTitle, CardContent,
+} from "@/components/ui/card";
+import { Input } from "@/components/ui/input";
+import { Button } from "@/components/ui/button";
+import { Label } from "@/components/ui/label";
+import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
+import { Popover, PopoverTrigger, PopoverContent } from "@/components/ui/popover";
+import { Skeleton } from "@/components/ui/skeleton";
+import { Calendar } from "@/components/ui/calendar";
+import { CalendarIcon } from "lucide-react";
+import { cn } from "@/lib/utils";
 import {
-  MapContainer,
-  TileLayer,
-  Marker,
-  Popup,
-  Polyline,
-  useMap,
-} from "react-leaflet"
-import L from "leaflet"
-import markerIcon2x from "leaflet/dist/images/marker-icon-2x.png"
-import markerIcon from "leaflet/dist/images/marker-icon.png"
-import markerShadow from "leaflet/dist/images/marker-shadow.png"
-import "leaflet/dist/leaflet.css"
-import { Skeleton } from "@/components/ui/skeleton"
+  MapContainer, TileLayer, Marker, Popup, Polyline, useMap,
+} from "react-leaflet";
+import L from "leaflet";
+import "leaflet/dist/leaflet.css";
+import markerIcon2x from "leaflet/dist/images/marker-icon-2x.png";
+import markerIcon   from "leaflet/dist/images/marker-icon.png";
+import markerShadow from "leaflet/dist/images/marker-shadow.png";
 
-
-/*****************************************************
- * Leaflet icon paths fix (Vite)
- *****************************************************/
-
-delete L.Icon.Default.prototype._getIconUrl
+/* ------------ Leaflet icon patch ------------ */
+delete L.Icon.Default.prototype._getIconUrl;
 L.Icon.Default.mergeOptions({
   iconRetinaUrl: markerIcon2x,
-  iconUrl: markerIcon,
-  shadowUrl: markerShadow,
-})
+  iconUrl:       markerIcon,
+  shadowUrl:     markerShadow,
+});
 
-/*****************************************************
- * AddressAutocomplete Component
- *****************************************************/
+/* ------------------------------------------------------------------ */
+/*  AddressAutocomplete                                               */
+/* ------------------------------------------------------------------ */
 function AddressAutocomplete({ label, onSelect }) {
-  const [query, setQuery] = useState("")
-  const [suggestions, setSuggestions] = useState([])
-  const [open, setOpen] = useState(false)
-  const ref = useRef(null)
-  
+  const [query, setQuery]             = useState("");
+  const [suggestions, setSuggestions] = useState([]);
+  const [open, setOpen]               = useState(false);
+  const ref = useRef(null);
 
-  // fetch suggestions
   useEffect(() => {
-    const controller = new AbortController()
-    if (query.length < 3) {
-      setSuggestions([])
-      return () => controller.abort()
-    }
-    fetch(
-      `https://api-adresse.data.gouv.fr/search/?q=${encodeURIComponent(query)}&limit=5`,
-      { signal: controller.signal }
-    )
-      .then((res) => res.json())
-      .then((data) => {
-        setSuggestions(
-          data.features.map((f) => ({
-            id: f.properties.id,
-            label: f.properties.label,
-            lat: f.geometry.coordinates[1],
-            lon: f.geometry.coordinates[0],
-          }))
-        )
+    if (query.length < 3) { setSuggestions([]); return; }
+    const ctrl = new AbortController();
+    fetch(`https://api-adresse.data.gouv.fr/search/?q=${encodeURIComponent(query)}&limit=5`,
+      { signal: ctrl.signal })
+      .then(r => r.json())
+      .then(d => {
+        const feats = Array.isArray(d?.features) ? d.features : [];
+        setSuggestions(feats.map(f => ({
+          id:    f.properties.id,
+          label: f.properties.label,
+          lat:   f.geometry.coordinates[1],
+          lon:   f.geometry.coordinates[0],
+        })));
       })
-      .catch((err) => {
-        if (err.name !== "AbortError") console.error(err)
-      })
-    return () => controller.abort()
-  }, [query])
+      .catch(e => { if (e.name !== "AbortError") console.error(e); });
+    return () => ctrl.abort();
+  }, [query]);
 
-  // close dropdown on outside click
+  /* close on outside click */
   useEffect(() => {
-    const handle = (e) => {
-      if (ref.current && !ref.current.contains(e.target)) setOpen(false)
-    }
-    document.addEventListener("mousedown", handle)
-    return () => document.removeEventListener("mousedown", handle)
-  }, [])
+    const h = e => { if (ref.current && !ref.current.contains(e.target)) setOpen(false); };
+    document.addEventListener("mousedown", h);
+    return () => document.removeEventListener("mousedown", h);
+  }, []);
 
   return (
     <div ref={ref} className="relative">
       <Label>{label}</Label>
       <Input
         value={query}
-        onChange={(e) => {
-          setQuery(e.target.value)
-          setOpen(true)
-        }}
+        onChange={e => { setQuery(e.target.value); setOpen(true); }}
         onFocus={() => setOpen(true)}
         placeholder={label}
         className="bg-white"
       />
       {open && suggestions.length > 0 && (
         <div className="absolute z-10 w-full bg-white border shadow-sm mt-1 rounded-md max-h-60 overflow-auto">
-          {suggestions.map((s) => (
+          {suggestions.map(s => (
             <div
               key={s.id}
               className="p-2 cursor-pointer hover:bg-gray-100"
               onMouseDown={() => {
-                setQuery(s.label)
-                onSelect({ address: s.label, lat: s.lat, lon: s.lon })
-                setOpen(false)
+                setQuery(s.label);
+                onSelect({ address: s.label, lat: s.lat, lon: s.lon });
+                setOpen(false);
               }}
             >
               {s.label}
@@ -119,163 +93,194 @@ function AddressAutocomplete({ label, onSelect }) {
         </div>
       )}
     </div>
-  )
+  );
 }
 
-function SkeletonCard() {
-  return (
-    <div className="flex flex-col space-y-3 w-full">
-      <Skeleton className="h-[125px] w-full rounded-xl" />
-      <div className="space-y-2">
-        <Skeleton className="h-4 w-full" />
-        <Skeleton className="h-4 w-3/4" />
-      </div>
-    </div>
-  )
-}
-
-/*****************************************************
- * FitBounds – zoom to markers
- *****************************************************/
+/* ------------------------------------------------------------------ */
+/*  FitBounds & RouteLine                                             */
+/* ------------------------------------------------------------------ */
 function FitBounds({ points }) {
-  const map = useMap()
-  useEffect(() => {
-    if (points.length === 0) return
-    const bounds = L.latLngBounds(points)
-    map.fitBounds(bounds, { padding: [50, 50] })
-  }, [points, map])
-  return null
+  const map = useMap();
+  useEffect(() => { if (points.length) map.fitBounds(L.latLngBounds(points), { padding: [50, 50] }); }, [points, map]);
+  return null;
 }
 
-/*****************************************************
- * RouteLine – draw polyline via OSRM
- *****************************************************/
 function RouteLine({ start, end }) {
-  const [coords, setCoords] = useState([])
-  const map = useMap() // not used but keeps hook order
-
+  const [coords, setCoords] = useState([]);
   useEffect(() => {
-    if (!start || !end) return
-    const controller = new AbortController()
-    const url = `https://router.project-osrm.org/route/v1/driving/${start.lon},${start.lat};${end.lon},${end.lat}?overview=full&geometries=geojson&alternatives=false`
-    fetch(url, { signal: controller.signal })
-      .then((res) => res.json())
-      .then((data) => {
-        if (data.code === "Ok" && data.routes.length) {
-          const geo = data.routes[0].geometry.coordinates
-          setCoords(geo.map(([lon, lat]) => [lat, lon]))
-        }
+    if (!start || !end) return;
+    const ctrl = new AbortController();
+    fetch(
+      `https://router.project-osrm.org/route/v1/driving/${start.lon},${start.lat};${end.lon},${end.lat}?overview=full&geometries=geojson`,
+      { signal: ctrl.signal }
+    )
+      .then(r => r.json())
+      .then(d => {
+        const line = d?.routes?.[0]?.geometry?.coordinates || [];
+        setCoords(line.map(([lon, lat]) => [lat, lon]));
       })
-      .catch((err) => {
-        if (err.name !== "AbortError") console.error(err)
-      })
-    return () => controller.abort()
-  }, [start, end])
-
-  if (!start || !end || coords.length === 0) return null
-  return <Polyline positions={coords} weight={4} />
+      .catch(e => { if (e.name !== "AbortError") console.error(e); });
+    return () => ctrl.abort();
+  }, [start, end]);
+  if (!coords.length) return null;
+  return <Polyline positions={coords} weight={4} />;
 }
 
-/*****************************************************
- * HomePage Component
- *****************************************************/
+/* ------------------------------------------------------------------ */
+/*  HomePage                                                          */
+/* ------------------------------------------------------------------ */
 export default function HomePage() {
-  // form state
-  const [mode, setMode] = useState("now")
-  const [date, setDate] = useState(null)
-  const [time, setTime] = useState("")
-  const [vehicleType, setVehicleType] = useState("eco")
+  const navigate = useNavigate();
 
-  const [departure, setDeparture] = useState(null)
-  const [arrival, setArrival] = useState(null)
+  /* ---------- user ---------- */
+  const [currentUser, setCurrentUser] = useState(null);
+  const readUser = useCallback(() => {
+    const raw = localStorage.getItem("user");
+    setCurrentUser(raw ? JSON.parse(raw) : null);
+  }, []);
+  useEffect(() => {
+    readUser();
+    window.addEventListener("userChanged", readUser);
+    return () => window.removeEventListener("userChanged", readUser);
+  }, [readUser]);
 
-  // temporary quote state
-  const [loading, setLoading] = useState(false)
-  const [quote, setQuote] = useState(null) // {km, minutes, price}
+  /* ---------- form ---------- */
+  const [mode, setMode]               = useState("now");
+  const [date, setDate]               = useState(null);
+  const [time, setTime]               = useState("");
+  const [vehicleType, setVehicleType] = useState("eco");
+  const [departure, setDeparture]     = useState(null);
+  const [arrival,   setArrival]       = useState(null);
 
-  // fill default date/time when switching to "later"
+  /* ---------- estimate ---------- */
+  const [loading, setLoading] = useState(false);
+  const [quote,   setQuote]   = useState(null);  // { km, minutes, price }
+
+  /* auto-fill date/heure si “Plus tard” */
   useEffect(() => {
     if (mode === "later") {
-      const now = new Date()
-      if (!date) setDate(now)
-      if (!time) {
-        const h = String(now.getHours()).padStart(2, "0")
-        const m = String(now.getMinutes()).padStart(2, "0")
-        setTime(`${h}:${m}`)
-      }
+      const now = new Date();
+      if (!date) setDate(now);
+      if (!time) setTime(now.toISOString().slice(11, 16)); // “HH:MM”
     }
-  }, [mode])
+  }, [mode]);
 
-  /********************** TEMPORARY ESTIMATION LOGIC **********************/
-  const base = 5
-  const perKm = 1.5
-  const perMin = 0.4
-  const calcPrice = (km, minutes) => (base + km * perKm + minutes * perMin).toFixed(2)
+  /* ---------- tarifs locaux (secours visiteurs) ---------- */
+  const tariffs = {
+    eco:      { base: 5, perKm: 1.5, perMin: 0.4 },
+    berline:  { base: 7, perKm: 1.8, perMin: 0.45 },
+    van:      { base: 8, perKm: 2.0, perMin: 0.50 },
+    goldwing: { base: 8, perKm: 2.0, perMin: 0.50 },
+  };
+  const priceLocal = (km, min) => {
+    const t = tariffs[vehicleType];
+    return (t.base + km * t.perKm + min * t.perMin).toFixed(2);
+  };
+  const vehicleApiType = vehicleType === "goldwing" ? "van" : vehicleType;
 
+  /* ---------- helpers ---------- */
+  const isoScheduled = () =>
+    mode === "later"
+      ? `${date.toISOString().split("T")[0]}T${time}:00Z`
+      : new Date().toISOString();
+
+  /* ---------- ESTIMATE ---------- */
   const handleEstimate = async () => {
-    if (!departure || !arrival) {
-      alert("Veuillez sélectionner les adresses de départ et d'arrivée")
-      return
-    }
-    // prevent past datetime if later
-    if (mode === "later" && date) {
-      const [h, m] = time.split(":")
-      const dt = new Date(date)
-      dt.setHours(Number(h))
-      dt.setMinutes(Number(m))
-      if (dt < new Date()) {
-        alert("Veuillez choisir une date et une heure ultérieures.")
-        return
-      }
-    }
-
-    setLoading(true)
-    setQuote(null)
+    if (!departure || !arrival) { alert("Sélectionnez départ & arrivée."); return; }
+    setLoading(true); setQuote(null);
 
     try {
-      const url = `https://router.project-osrm.org/route/v1/driving/${departure.lon},${departure.lat};${arrival.lon},${arrival.lat}?overview=false&geometries=polyline&alternatives=false`
-      const res = await fetch(url)
-      const data = await res.json()
-      if (data.code === "Ok" && data.routes.length) {
-        const { distance, duration } = data.routes[0] // m, s
-        const km = distance / 1000
-        const minutes = Math.ceil(duration / 60)
-        const price = calcPrice(km, minutes)
-        setQuote({ km, minutes, price })
+      if (currentUser) {
+        /* ----- appel backend ----- */
+        const res = await fetch("/api/bookings/estimate/", {
+          method: "POST",
+          headers: {
+            "Content-Type":"application/json",
+            Authorization:`Bearer ${localStorage.getItem("access_token")}`,
+          },
+          body: JSON.stringify({
+            pickup_address:        departure.address,
+            pickup_latitude:       departure.lat,
+            pickup_longitude:      departure.lon,
+            destination_address:   arrival.address,
+            destination_latitude:  arrival.lat,
+            destination_longitude: arrival.lon,
+            vehicle_type:          vehicleApiType,
+            scheduled_time:        isoScheduled(),
+          }),
+        });
+        if (!res.ok) throw new Error();
+        const data = (await res.json()).data ?? (await res.json());
+        setQuote({
+          km:      Number(data.distance_km),
+          minutes: Number(data.estimated_duration_minutes),
+          price:   Number(data.estimated_price).toFixed(2),
+        });
       } else {
-        alert("Impossible de calculer l'estimation.")
+        /* ----- visiteur : OSRM + calcul local ----- */
+        const d = await fetch(
+          `https://router.project-osrm.org/route/v1/driving/${departure.lon},${departure.lat};${arrival.lon},${arrival.lat}?overview=false`
+        ).then(r => r.json());
+        if (d.code !== "Ok") throw new Error();
+        const km  = d.routes[0].distance / 1000;
+        const min = Math.ceil(d.routes[0].duration / 60);
+        setQuote({ km, minutes: min, price: priceLocal(km, min) });
       }
-    } catch (e) {
-      console.error(e)
-      alert("Erreur réseau lors du calcul de l'estimation.")
-    } finally {
-      setLoading(false)
-    }
-  }
+    } catch {
+      alert("Impossible de calculer l'estimation.");
+    } finally { setLoading(false); }
+  };
 
-  // map points
-  const points = []
-  if (departure) points.push([departure.lat, departure.lon])
-  if (arrival) points.push([arrival.lat, arrival.lon])
+  /* ---------- CREATE ---------- */
+  const handleCreate = async () => {
+    if (!currentUser) { navigate("/login"); return; }
+    try {
+      const res = await fetch("/api/bookings/create/", {
+        method:"POST",
+        headers:{
+          "Content-Type":"application/json",
+          Authorization:`Bearer ${localStorage.getItem("access_token")}`,
+        },
+        body:JSON.stringify({
+          pickup_address:        departure.address,
+          pickup_latitude:       departure.lat,
+          pickup_longitude:      departure.lon,
+          destination_address:   arrival.address,
+          destination_latitude:  arrival.lat,
+          destination_longitude: arrival.lon,
+          estimated_price:       quote.price,
+          vehicle_type:          vehicleApiType,   // stocké dans la réservation
+          scheduled_time:        isoScheduled(),
+        }),
+      });
+      if (!res.ok) throw new Error();
+      alert("Réservation confirmée !");
+      navigate(`/customer/${currentUser.id}`);
+    } catch { alert("Erreur de création de réservation."); }
+  };
 
+  /* ---------- carte ---------- */
+  const pts = [];
+  if (departure) pts.push([departure.lat, departure.lon]);
+  if (arrival)   pts.push([arrival.lat,   arrival.lon]);
+
+  /* ---------- JSX ---------- */
   return (
-    <div className="min-h-screen flex flex-col items-start justify-start bg-white p-4 space-y-6 ml-40 pt-24">
-      <h1 className="text-4xl font-bold">Voyager sereinement avec nous</h1>
+    <div className="min-h-screen flex flex-col items-start bg-white p-4 space-y-6 ml-40 pt-24">
+      <h1 className="text-4xl font-bold">Voyagez sereinement avec nous</h1>
 
       <div className="flex flex-col md:flex-row w-full max-w-6xl gap-6">
-        {/***************** FORM CARD *****************/}
+        {/* -------- Formulaire -------- */}
         <Card className="w-full md:w-1/2">
-          <CardHeader>
-            <CardTitle>Réservation rapide</CardTitle>
-          </CardHeader>
+          <CardHeader><CardTitle>Réservation rapide</CardTitle></CardHeader>
           <CardContent className="space-y-4">
             <AddressAutocomplete label="Adresse de départ" onSelect={setDeparture} />
             <AddressAutocomplete label="Adresse d'arrivée" onSelect={setArrival} />
 
-            {/* moment choice */}
+            {/* Quand ? */}
             <div className="space-y-2">
-              <Label>Quand souhaitez-vous partir ?</Label>
-              <RadioGroup defaultValue="now" onValueChange={setMode}>
+              <Label>Quand souhaitez-vous partir&nbsp;?</Label>
+              <RadioGroup value={mode} onValueChange={setMode}>
                 <div className="flex items-center space-x-2">
                   <RadioGroupItem value="now" id="now" />
                   <Label htmlFor="now">Maintenant</Label>
@@ -287,24 +292,19 @@ export default function HomePage() {
               </RadioGroup>
             </div>
 
-            {mode === "later" && (
+            {/* Date / heure */}
+            {mode==="later" && (
               <div className="grid gap-4">
                 <div className="grid gap-2">
-                  <Label>Date de départ</Label>
+                  <Label>Date</Label>
                   <Popover>
                     <PopoverTrigger asChild>
-                      <Button
-                        variant="outline"
-                        className={cn(
-                          "w-full justify-start text-left",
-                          !date && "text-muted-foreground"
-                        )}
-                      >
+                      <Button variant="outline" className={cn("w-full justify-start", !date && "text-muted-foreground")}>
                         <CalendarIcon className="mr-2 h-4 w-4" />
-                        {date ? format(date, "dd/MM/yyyy") : "Choisir une date"}
+                        {date ? date.toLocaleDateString() : "Choisir"}
                       </Button>
                     </PopoverTrigger>
-                    <PopoverContent className="w-auto p-0 bg-white rounded-xl shadow-lg border">
+                    <PopoverContent className="p-0 w-auto bg-white rounded-xl shadow-lg border">
                       <Calendar
                         mode="single"
                         selected={date}
@@ -315,122 +315,95 @@ export default function HomePage() {
                     </PopoverContent>
                   </Popover>
                 </div>
-
                 <div className="grid gap-2">
-                  <Label htmlFor="time">Heure souhaitée</Label>
-                  <Input
-                    id="time"
-                    type="time"
-                    value={time}
-                    onChange={(e) => setTime(e.target.value)}
-                    className="w-full"
-                  />
+                  <Label htmlFor="time">Heure</Label>
+                  <Input id="time" type="time" value={time} onChange={e=>setTime(e.target.value)} />
                 </div>
               </div>
             )}
 
-            {/* vehicle options */}
-            <div className="grid grid-cols-2 gap-4 items-stretch">
-              {vehicleOptions.map(({ value, label, image }) => (
+            {/* Véhicules */}
+            <div className="grid grid-cols-2 gap-4">
+              {vehicleOptions.map(opt => (
                 <Card
-                  key={value}
-                  onClick={() => setVehicleType(value)}
+                  key={opt.value}
+                  onClick={()=>setVehicleType(opt.value)}
                   className={cn(
-                    "p-2 rounded-md border cursor-pointer transition-all duration-200 flex flex-col items-center justify-center gap-y-1",
-                    vehicleType === value && "border-black bg-muted"
+                    "p-2 border rounded-md cursor-pointer flex flex-col items-center gap-1 transition",
+                    vehicleType===opt.value && "border-black bg-muted"
                   )}
                 >
-                  <img src={image} alt={label} className="h-16 object-contain" />
-                  <span className="text-sm font-medium leading-none">{label}</span>
+                  <img src={opt.image} alt={opt.label} className="h-16 object-contain" />
+                  <span className="text-sm">{opt.label}</span>
                 </Card>
               ))}
             </div>
 
-            <Button
-              className="w-full bg-black text-white hover:bg-gray-900"
-              onClick={handleEstimate}
-              disabled={loading}
-            >
+            <Button className="w-full bg-black" onClick={handleEstimate} disabled={loading}>
               {loading ? "Calcul..." : "Estimer le prix"}
             </Button>
 
-            {/* Skeleton pendant le chargement */}
             {loading && <SkeletonCard />}
-
 
             {quote && (
               <Card className="bg-muted/50 mt-2">
-                <CardHeader>
-                  <CardTitle>Estimation</CardTitle>
-                </CardHeader>
+                <CardHeader><CardTitle>Estimation</CardTitle></CardHeader>
                 <CardContent className="space-y-1">
                   <div className="flex justify-between"><span>Distance</span><span>{quote.km.toFixed(1)} km</span></div>
                   <div className="flex justify-between"><span>Durée</span><span>{quote.minutes} min</span></div>
-                  <div className="flex justify-between font-semibold"><span>Prix estimé</span><span>{quote.price} €</span></div>
-                  {/* Bouton de connexion */}
+                  <div className="flex justify-between font-semibold"><span>Prix</span><span>{quote.price} €</span></div>
+
+                  {currentUser ? (
+                    <Button className="w-full mt-4" onClick={handleCreate}>
+                      Réserver maintenant
+                    </Button>
+                  ) : (
                     <Button
                       variant="outline"
                       className="w-full mt-4"
-                      onClick={() => alert('Redirection vers la connexion...')}
+                      onClick={() => { navigate("/login"); }}
                     >
                       Connectez-vous pour commander
                     </Button>
+                  )}
                 </CardContent>
               </Card>
             )}
           </CardContent>
         </Card>
 
-        {/***************** MAP *****************/}
+        {/* -------- Carte -------- */}
         <div className="w-full md:w-1/2 h-[500px] rounded-xl overflow-hidden border">
-          <MapContainer
-            center={[48.8566, 2.3522]}
-            zoom={13}
-            scrollWheelZoom={false}
-            className="w-full h-full z-0"
-          >
-            <TileLayer
-              attribution="&copy; OpenStreetMap"
-              url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png"
-            />
-            {departure && (
-              <Marker position={[departure.lat, departure.lon]}>
-                <Popup>Départ: {departure.address}</Popup>
-              </Marker>
-            )}
-            {arrival && (
-              <Marker position={[arrival.lat, arrival.lon]}>
-                <Popup>Arrivée: {arrival.address}</Popup>
-              </Marker>
-            )}
-            {points.length > 0 && <FitBounds points={points} />}
+          <MapContainer center={[48.8566, 2.3522]} zoom={13} scrollWheelZoom={false} className="w-full h-full">
+            <TileLayer attribution="&copy; OpenStreetMap" url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png" />
+            {departure && <Marker position={[departure.lat, departure.lon]}><Popup>{departure.address}</Popup></Marker>}
+            {arrival   && <Marker position={[arrival.lat,   arrival.lon]}  ><Popup>{arrival.address}</Popup></Marker>}
+            {pts.length>0 && <FitBounds points={pts} />}
             {departure && arrival && <RouteLine start={departure} end={arrival} />}
           </MapContainer>
         </div>
       </div>
     </div>
-  )
+  );
 }
 
+/* ---------- Options véhicules ---------- */
 const vehicleOptions = [
-  {
-    value: "eco",
-    label: "Eco",
-    image: "https://i.ibb.co/cSfk04p4/2025-MBC68193482303-removebg-preview.png",
-  },
-  {
-    value: "berline",
-    label: "Berline",
-    image: "https://i.ibb.co/cSfk04p4/2025-MBC68193482303-removebg-preview.png",
-  },
-  {
-    value: "van",
-    label: "Van",
-    image: "https://i.ibb.co/cSfk04p4/2025-MBC68193482303-removebg-preview.png",
-  },
-  {
-    value: "goldwing",
-    label: "Goldwing",
-    image: "https://i.ibb.co/cSfk04p4/2025-MBC68193482303-removebg-preview.png",
-  },
-]
+  { value:"eco",      label:"Eco",      image:"https://i.ibb.co/cSfk04p4/2025-MBC68193482303-removebg-preview.png" },
+  { value:"berline",  label:"Berline",  image:"https://i.ibb.co/cSfk04p4/2025-MBC68193482303-removebg-preview.png" },
+  { value:"van",      label:"Van",      image:"https://i.ibb.co/cSfk04p4/2025-MBC68193482303-removebg-preview.png" },
+  { value:"goldwing", label:"Goldwing", image:"https://i.ibb.co/cSfk04p4/2025-MBC68193482303-removebg-preview.png" },
+];
+
+/* ---------- SkeletonCard ---------- */
+function SkeletonCard() {
+  return (
+    <div className="flex flex-col space-y-3 w-full">
+      <Skeleton className="h-[125px] w-full rounded-xl" />
+      <div className="space-y-2">
+        <Skeleton className="h-4 w-full" />
+        <Skeleton className="h-4 w-3/4" />
+      </div>
+    </div>
+  );
+}

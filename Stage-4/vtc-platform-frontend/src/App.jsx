@@ -21,7 +21,7 @@ export default function App() {
           <Route path="/login" element={<LoginPage />} />
           <Route path="/register" element={<RegisterPage />} />
           <Route path="/admin/login" element={<LoginPageAdmin />} />
-          <Route path="/customer/:id" element={<CustomerPage client={mockClient} />} />
+          <Route path="/customer/:id" element={<CustomerPage />} />
           <Route path="/admin/dashboard" element={<AdminDashboard />} />
         </Routes>
       </div>
