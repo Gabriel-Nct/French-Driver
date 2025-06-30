@@ -28,13 +28,13 @@
 
 | US013 | Réception demandes temps réel (Admin) | 2j | Gabriel | Booking model, API |
   
-#### 🟡 SHOULD HAVE (Si temps disponible)
+####  SHOULD HAVE (Si temps disponible)
 
 | US ID | User Story | Estimation | Assigné | Dépendances |
 
 | US008 | Géolocalisation automatique | 1j | Brahim | US001 complété |
 
-### 📅 Planning Détaillé Sprint 1
+###  Planning Détaillé Sprint 1
 
 #### Semaine 1 (Jours 1-7)
 **Gabriel - Backend**
