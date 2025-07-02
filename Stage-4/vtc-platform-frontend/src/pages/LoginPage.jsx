@@ -59,8 +59,7 @@ export default function LoginPage() {
           destination_latitude:  Number(p.arrival.lat),
           destination_longitude: Number(p.arrival.lon),
           estimated_price:       Number(p.quote.price),
-          vehicle_type:          p.vehicle_type,              // à retirer si non utilisé côté backend
-          // toujours présent : si non planifié, on prend maintenant
+          vehicle_type:          p.vehicle_type,
           scheduled_time:        p.scheduled_time || new Date().toISOString(),
         };
 
@@ -147,12 +146,23 @@ export default function LoginPage() {
               </Button>
 
               <div className="text-center text-sm text-gray-600 mt-2">
-                Pas de compte ?{" "}
+                Pas de compte ?{' '}
                 <Link
                   to="/register"
                   className="font-semibold text-black hover:underline"
                 >
                   S'inscrire
+                </Link>
+              </div>
+
+              {/* Lien vers la page de connexion admin */}
+              <div className="text-center text-sm text-gray-600 mt-1">
+                Vous êtes administrateur ?{' '}
+                <Link
+                  to="/admin/login"
+                  className="font-semibold text-black hover:underline"
+                >
+                  Connexion Admin
                 </Link>
               </div>
             </form>
