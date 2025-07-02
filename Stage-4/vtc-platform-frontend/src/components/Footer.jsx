@@ -1,8 +1,6 @@
 import { Separator } from "@/components/ui/separator";
 import { Instagram, Send } from "lucide-react";
 
-/* --- Icône “X” (nouveau Twitter) ------------------------------------------------
-     Source : Bootstrap Icons  (viewBox 0 0 16 16) :contentReference[oaicite:0]{index=0}               */
 function XIcon(props) {
   return (
     <svg
@@ -34,21 +32,21 @@ export default function Footer() {
         {/* --- Réseaux sociaux --- */}
         <div className="flex gap-6">
           <a
-            href="https://x.com/frenchdriver"        /* remplace par ton handle */
+            href="https://x.com/"        
             aria-label="French Driver sur X"
             className="hover:text-white transition-colors"
           >
             <XIcon className="h-5 w-5" />
           </a>
           <a
-            href="https://instagram.com/frenchdriver" /* remplace par ton handle */
+            href="https://instagram.com/" 
             aria-label="French Driver sur Instagram"
             className="hover:text-white transition-colors"
           >
             <Instagram className="h-5 w-5" />
           </a>
           <a
-            href="https://t.me/frenchdriver"          /* remplace par ton lien  */
+            href="https://t.me/"          
             aria-label="French Driver sur Telegram"
             className="hover:text-white transition-colors"
           >
