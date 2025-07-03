@@ -10,6 +10,9 @@ import asyncio
 from .telegram_service import telegram_service
 from django.db import transaction, IntegrityError
 from django.utils import timezone
+from django.core.mail import EmailMultiAlternatives
+from django.template.loader import render_to_string
+
 
 
 class PricingService:
@@ -301,6 +304,46 @@ class InvoiceService:
     Service for invoice management
     """
 
+        # ---------- 0. Envoi de la facture par e-mail (HTML) ----------
+    @staticmethod
+    def _send_invoice_email(invoice: Invoice) -> bool:
+        """
+        Construit un e-mail HTML + texte et l'envoie au client.
+        """
+        subject = f"Votre facture {invoice.invoice_number}"
+
+        # Corps HTML : templates/email/invoice.html
+        html_body = render_to_string(
+            "email/invoice.html",
+            {"invoice": invoice},
+        )
+
+        # Fallback texte brut (lisible même sans HTML)
+        text_body = (
+            f"Facture {invoice.invoice_number}\n"
+            f"Date  : {invoice.generated_at:%d/%m/%Y}\n"
+            f"Trajet: {invoice.booking.pickup_address} -> "
+            f"{invoice.booking.destination_address}\n"
+            f"Montant TTC : {invoice.amount} €\n"
+            "\nMerci de votre confiance.\nL’équipe French Driver"
+        )
+
+        email = EmailMultiAlternatives(
+            subject=subject,
+            body=text_body,
+            from_email=settings.DEFAULT_FROM_EMAIL,
+            to=[invoice.booking.user.email],
+        )
+        email.attach_alternative(html_body, "text/html")
+
+        try:
+            email.send(fail_silently=False)
+            return True
+        except Exception as e:
+            print(f"Erreur envoi facture HTML : {e}")
+            return False
+
+
     # ---------- 1. Génération thread-safe du numéro ----------
     @staticmethod
     def _next_invoice_number() -> str:
@@ -345,18 +388,25 @@ class InvoiceService:
                 # juste avant le commit → on relance la boucle
                 continue
 
-    # ---------- 3. API publique ----------
+        # ---------- 3. API publique ----------
     @classmethod
     def generate_invoice(cls, booking: Booking) -> Optional[Invoice]:
         """
-        Génère (ou renvoie) la facture liée à une réservation complétée.
+        Assure qu'une facture existe, puis l'envoie par e-mail HTML.
+        AUCUN PDF n'est produit.
         """
         if booking.status != "COMPLETED":
             return None
 
-        # a/ si elle existe déjà → on la renvoie
-        if hasattr(booking, "invoice"):
-            return booking.invoice
+        # 1. Récupérer ou créer la facture
+        invoice = getattr(booking, "invoice", None) or cls._create_unique_invoice(booking)
 
-        # b/ sinon on la crée de façon sûre
-        return cls._create_unique_invoice(booking)
+        # 2. Envoyer l'e-mail (on peut mémoriser l'envoi avec sent_at)
+        sent_ok = cls._send_invoice_email(invoice)
+
+        # (optionnel) marquer l'envoi pour éviter les doublons
+        if sent_ok and not getattr(invoice, "sent_at", None):
+            invoice.sent_at = timezone.now()
+            invoice.save(update_fields=["sent_at"])
+
+        return invoice

@@ -1,0 +1,273 @@
+<!doctype html>
+<html>
+  <head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <style>
+      * { box-sizing: border-box; margin: 0; padding: 0; }
+      
+      body { 
+        font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; 
+        line-height: 1.6; 
+        color: #333;
+        background: white;
+        min-height: 100vh;
+        padding: 20px;
+      }
+      
+      .invoice-container {
+        max-width: 800px;
+        margin: 0 auto;
+        background: white;
+        border-radius: 12px;
+        box-shadow: 0 4px 20px rgba(0,0,0,0.08);
+        overflow: hidden;
+        border: 1px solid #e5e7eb;
+      }
+      
+      .invoice-header {
+        background: white;
+        padding: 40px;
+        text-align: center;
+        border-bottom: 2px solid #f3f4f6;
+      }
+      
+      .company-logo {
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        gap: 15px;
+        margin-bottom: 20px;
+      }
+      
+      .company-logo img {
+        height: 60px;
+        width: auto;
+      }
+      
+      .company-name {
+        font-size: 32px;
+        font-weight: bold;
+        color: #1f2937;
+      }
+      
+      .invoice-title {
+        font-size: 28px;
+        font-weight: 600;
+        margin-bottom: 5px;
+        color: #374151;
+      }
+      
+      .invoice-number {
+        font-size: 18px;
+        color: #6b7280;
+        font-weight: 500;
+      }
+      
+      .invoice-body {
+        padding: 40px;
+      }
+      
+      .greeting {
+        font-size: 18px;
+        margin-bottom: 20px;
+        color: #1f2937;
+        font-weight: 500;
+      }
+      
+      .thank-you {
+        font-size: 16px;
+        margin-bottom: 30px;
+        color: #4b5563;
+      }
+      
+      .details-section {
+        background: #f9fafb;
+        border-radius: 8px;
+        padding: 30px;
+        margin-bottom: 30px;
+        border: 1px solid #e5e7eb;
+      }
+      
+      .details-grid {
+        display: grid;
+        grid-template-columns: 1fr 2fr;
+        gap: 20px;
+        align-items: center;
+      }
+      
+      .detail-label {
+        font-weight: 600;
+        color: #1f2937;
+        display: flex;
+        align-items: center;
+        gap: 8px;
+      }
+      
+      .detail-value {
+        color: #4b5563;
+        font-size: 15px;
+      }
+      
+      .route {
+        display: flex;
+        align-items: center;
+        gap: 10px;
+        font-weight: 500;
+      }
+      
+      .route-arrow {
+        color: #6b7280;
+        font-size: 18px;
+      }
+      
+      .amount-section {
+        background: #1f2937;
+        color: white;
+        padding: 30px;
+        border-radius: 8px;
+        text-align: center;
+        margin-bottom: 30px;
+      }
+      
+      .amount-label {
+        font-size: 16px;
+        opacity: 0.9;
+        margin-bottom: 10px;
+      }
+      
+      .amount-value {
+        font-size: 36px;
+        font-weight: bold;
+      }
+      
+      .footer {
+        text-align: center;
+        padding: 30px;
+        background: #f9fafb;
+        border-top: 1px solid #e5e7eb;
+      }
+      
+      .footer-message {
+        font-size: 16px;
+        color: #4b5563;
+        margin-bottom: 10px;
+      }
+      
+      .company-signature {
+        font-weight: 600;
+        color: #1f2937;
+        font-size: 18px;
+      }
+      
+      .icon {
+        width: 20px;
+        height: 20px;
+        display: inline-block;
+        vertical-align: middle;
+      }
+      
+      @media (max-width: 600px) {
+        .invoice-container {
+          margin: 10px;
+          border-radius: 8px;
+        }
+        
+        .invoice-header {
+          padding: 30px 20px;
+        }
+        
+        .invoice-body {
+          padding: 30px 20px;
+        }
+        
+        .details-grid {
+          grid-template-columns: 1fr;
+          gap: 15px;
+        }
+        
+        .detail-label {
+          font-size: 14px;
+        }
+        
+        .amount-value {
+          font-size: 28px;
+        }
+        
+        .company-logo {
+          flex-direction: column;
+          gap: 10px;
+        }
+        
+        .company-name {
+          font-size: 24px;
+        }
+      }
+    </style>
+  </head>
+  <body>
+    <div class="invoice-container">
+      <div class="invoice-header">
+        <div class="company-logo">
+          <img src="https://i.ibb.co/4RDdKn8S/logo.png" alt="French Driver Logo">
+          <div class="company-name">French Driver</div>
+        </div>
+        <div class="invoice-title">Facture</div>
+        <div class="invoice-number">{{ invoice.invoice_number }}</div>
+      </div>
+      
+      <div class="invoice-body">
+        <div class="greeting">
+          Bonjour {{ invoice.booking.user.get_full_name|default:invoice.booking.user.username }},
+        </div>
+        
+        <div class="thank-you">
+          Merci de votre confiance. Voici le récapitulatif de votre course :
+        </div>
+        
+        <div class="details-section">
+          <div class="details-grid">
+            <div class="detail-label">
+              <span class="icon">📅</span>
+              Date de la course
+            </div>
+            <div class="detail-value">
+              {{ invoice.booking.scheduled_time|date:"d/m/Y H:i" }}
+            </div>
+            
+            
+            <div class="detail-label">
+              <span class="icon">🗺️</span>
+              Trajet
+            </div>
+            <div class="detail-value">
+              <div class="route">
+                {{ invoice.booking.pickup_address }}
+                <span class="route-arrow">→</span>
+                {{ invoice.booking.destination_address }}
+              </div>
+            </div>
+            
+            <div class="detail-label">
+              <span class="icon">🎫</span>
+              Numéro de réservation
+            </div>
+            <div class="detail-value">
+              {{ invoice.booking.confirmation_number }}
+            </div>
+          </div>
+        </div>
+        
+        <div class="amount-section">
+          <div class="amount-label">Montant TTC</div>
+          <div class="amount-value">{{ invoice.amount }} €</div>
+        </div>
+      </div>
+      
+      <div class="footer">
+        <div class="footer-message">À bientôt pour votre prochaine course !</div>
+        <div class="company-signature">L'équipe French Driver</div>
+      </div>
+    </div>
+  </body>
+</html>

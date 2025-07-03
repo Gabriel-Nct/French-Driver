@@ -301,6 +301,8 @@ class Booking(models.Model):
             if final_price:
                 self.final_price = final_price
             self.save()
+            from core.services import InvoiceService
+            InvoiceService.generate_invoice(self)
 
     def cancel(self):
         """Cancel the reservation"""
@@ -379,6 +381,7 @@ class Invoice(models.Model):
     )
 
     generated_at = models.DateTimeField(auto_now_add=True)
+    sent_at      = models.DateTimeField(null=True, blank=True) 
 
     pdf_path = models.CharField(
         max_length=255,
