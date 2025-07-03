@@ -225,6 +225,27 @@ export default function HomePage() {
       ? `${date.toISOString().split("T")[0]}T${time}:00Z`
       : new Date().toISOString();
 
+  /* ------------------------------------------------------------------ */
+  /*  NEW: save draft + redirect to Login                                */
+  /* ------------------------------------------------------------------ */
+  const handleLoginRedirect = () => {
+    if (!departure || !arrival || !quote) {
+      alert("Veuillez d'abord estimer le prix avant de continuer.");
+      return;
+    }
+
+    const pending = {
+      departure,
+      arrival,
+      vehicleType,
+      scheduled_time: isoScheduled(),
+      quote,
+    };
+
+    localStorage.setItem("pendingBooking", JSON.stringify(pending));
+    navigate("/login");
+  };
+
   /* ---------- ESTIMATE ---------- */
   const handleEstimate = async () => {
     if (!departure || !arrival) {
@@ -428,6 +449,12 @@ export default function HomePage() {
                 {loading ? "Calcul..." : "Estimer le prix"}
               </Button>
 
+                {!currentUser && (
+                  <p className="text-sm italic text-gray-500 mt-2 text-center">
+                    Connectez-vous pour avoir une estimation réelle.
+                  </p>
+                )}
+
               {loading && <SkeletonCard />}
 
               {quote && (
@@ -460,9 +487,7 @@ export default function HomePage() {
                       <Button
                         variant="outline"
                         className="w-full mt-4"
-                        onClick={() => {
-                          navigate("/login");
-                        }}
+                        onClick={handleLoginRedirect}
                       >
                         Connectez-vous pour commander
                       </Button>
@@ -475,17 +500,16 @@ export default function HomePage() {
 
           {/* -------- Carte -------- */}
           <div className="w-full md:w-1/2 h-[500px] rounded-xl overflow-hidden border">
-          <MapContainer
-                center={[48.8566, 2.3522]}
-                zoom={13}
-                scrollWheelZoom={false}
-                className="
-                  w-full h-full
-                  relative z-0
-                  [&_.leaflet-control]:z-0
-                "
-              >
-
+            <MapContainer
+              center={[48.8566, 2.3522]}
+              zoom={13}
+              scrollWheelZoom={false}
+              className="
+                w-full h-full
+                relative z-0
+                [&_.leaflet-control]:z-0
+              "
+            >
               <TileLayer
                 attribution="&copy; OpenStreetMap"
                 url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png"
@@ -510,8 +534,7 @@ export default function HomePage() {
       </div>
 
       {/* -------- Cartes Suggestions -------- */}
-        <SuggestionsSection />
-
+      <SuggestionsSection />
 
       {/* ---------- Footer ---------- */}
       <Footer /> {/* que sur HomePage */}
