@@ -82,7 +82,7 @@ class DriverSerializer(serializers.ModelSerializer):
         model = Driver
         fields = (
             'id', 'name', 'phone_number', 'email', 'license_number',
-            'vehicle_info', 'vehicle_summary', 'created_at'
+            'vehicle_info', 'vehicle_summary', 'telegram_chat_id', 'created_at'
         )
         read_only_fields = ('id', 'created_at')
 
