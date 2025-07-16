@@ -1,8 +1,8 @@
-#  French Driver - Landing Page
+# French Driver - Landing Page
 
 Landing page moderne et responsive pour French Driver, une plateforme révolutionnaire de transport français.
 
-##  Prérequis
+## Prérequis
 
 Avant de commencer, assurez-vous d'avoir installé :
 
@@ -41,21 +41,21 @@ npm run dev
 
 Le site sera accessible à l'adresse : **http://localhost:5173**
 
-##  Fonctionnalités
+## Fonctionnalités
 
 -    **Design moderne** avec animations fluides
 -    **Responsive** sur tous les appareils
 -    **Galerie d'images** avec lightbox interactive
 -    **Optimisé** pour les performances
 
-##  Technologies utilisées
+## Technologies utilisées
 
 -   **React 18** + TypeScript
 -   **Vite** pour le build rapide
 -   **Tailwind CSS** pour le styling
 -   **ESLint** pour la qualité du code
 
-##  Structure du projet
+## Structure du projet
 
 ```
 src/
@@ -69,7 +69,7 @@ src/
 └── main.tsx            # Point d'entrée
 ```
 
-##  Gestion des images
+## Gestion des images
 
 Pour ajouter vos propres images :
 
@@ -81,21 +81,21 @@ Pour ajouter vos propres images :
     ```
     
 
-##  Sections de la landing page
+## Sections de la landing page
 
-###  **Hero**
+### **Hero**
 
 -   Titre principal avec animation
 -   Boutons d'action (CTA)
 -   Effet de défilement animé
 
-###  **Features**
+### **Features**
 
 -   3 fonctionnalités principales
 -   Images cliquables avec lightbox
 -   Descriptions détaillées
 
-###  **About**
+### **About**
 
 -   Présentation de l'équipe
 -   Liens LinkedIn
@@ -104,7 +104,7 @@ Pour ajouter vos propres images :
 ### **Footer**
 -   Copyright
 
-##  Scripts disponibles
+## Scripts disponibles
 
 ```bash
 npm run dev          # Serveur de développement
@@ -114,12 +114,12 @@ npm run lint         # Vérifier le code
 ```
 
 
-## 👨‍💻 Équipe
+## Équipe
 
 -   **Gabriel Bescond** - Développeur Full-Stack
 -   **Brahim** - Développeur Full-Stack
 
-##  Licence
+## Licence
 
 Projet réalisé dans le cadre de la formation **Holberton School**.
 
