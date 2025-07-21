@@ -74,7 +74,7 @@ const About: React.FC = () => {
   <div className="bg-gray-50 rounded-2xl p-6 text-gray-900 mb-8">
     <div className="flex items-center justify-center lg:justify-end gap-4">
       <img
-        src="/images/logo.png"
+        src="https://i.ibb.co/JwRnFGcy/logo.png"
         alt="Logo French Driver"
         className="h-20 w-auto"
       />
