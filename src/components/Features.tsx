@@ -17,21 +17,21 @@ const Features: React.FC = () => {
       id: 'reservation',
       title: 'Page de Réservation',
       description: 'Réservez un chauffeur en quelques clics grâce à une interface simple et rapide, pensée pour les passagers comme pour les professionnels.',
-      image: '/images/page-reservation.png', // Remettez vos vraies images
+      image: 'https://i.ibb.co/NdXfTdn9/page-reservation.png', // Remettez vos vraies images
       icon: Calendar
     },
     {
       id: 'dashboard',
       title: 'Dashboard Admin',
       description: 'Gérez l\'ensemble de vos opérations avec un tableau de bord complet : statistiques, utilisateurs, réservations, et plus encore.',
-      image: '/images/dashboard-admin.png',
+      image: 'https://i.ibb.co/LDYGsppv/dashboard-admin.png',
       icon: BarChart3
     },
     {
       id: 'drivers',
       title: 'Gestion des Chauffeurs',
       description: 'Ajoutez facilement de nouveaux chauffeurs à la plateforme avec toutes leurs informations : véhicule, contact et statut.',
-      image: '/images/ajout-chauffeurs.png',
+      image: 'https://i.ibb.co/d4Y5ypm2/ajout-chauffeurs.png',
       icon: UserPlus
     }
   ];
