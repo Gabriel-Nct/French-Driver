@@ -1,12 +1,25 @@
 # core/views_api.py
+from datetime import timedelta
+import json
+import logging
+
+from django.conf import settings
+from django.core.mail import send_mail
+from rest_framework.permissions import AllowAny
+
+
+from django.db.models import Q, Count, Sum, Avg
+from django.utils import timezone
+from django.utils.decorators import method_decorator
+from django.views.decorators.csrf import csrf_exempt
+
 from rest_framework import generics, status, permissions
 from rest_framework.decorators import api_view, permission_classes
+from rest_framework.exceptions import PermissionDenied
 from rest_framework.response import Response
 from rest_framework.views import APIView
 from rest_framework_simplejwt.views import TokenObtainPairView
-from django.db.models import Q, Count, Sum, Avg
-from django.utils import timezone
-from datetime import timedelta
+
 from .models import User, Driver, Booking, Invoice
 from .serializers import (
     CustomTokenObtainPairSerializer, UserRegistrationSerializer,
@@ -14,19 +27,17 @@ from .serializers import (
     BookingEstimateSerializer, BookingCreateSerializer,
     BookingSerializer, BookingUpdateSerializer, InvoiceSerializer,
     PriceEstimateResponseSerializer,
-    AdminDashboardSerializer, DispatchSerializer
+    AdminDashboardSerializer, DispatchSerializer,
+    ContactSerializer,
 )
+# APRÈS
 from .services import (
     PricingService, NotificationService, DispatchService, InvoiceService
 )
-from rest_framework import permissions
-from rest_framework.exceptions import PermissionDenied
-from .models import Invoice
-from .models import Invoice
-from .serializers import InvoiceSerializer
-from django.views.decorators.csrf import csrf_exempt
-from django.utils.decorators import method_decorator
-import json
+from vtc_platform.captcha import verify_turnstile_token, get_client_ip
+
+
+logger = logging.getLogger(__name__)
 
 
 # ===============================
@@ -73,83 +84,120 @@ def user_profile(request):
 # ===============================
 
 class BookingEstimateView(APIView):
-    """View for price estimation"""
-    permission_classes = [permissions.IsAuthenticated]
+    """Estimation de prix (ouverte aux invités)"""
+    permission_classes = [permissions.AllowAny]
 
     def post(self, request):
-        serializer = BookingEstimateSerializer(data=request.data)
-        serializer.is_valid(raise_exception=True)
+        d = request.data
+        try:
+            pickup_lat = float(d.get("pickup_lat") or d.get("pickup_latitude"))
+            pickup_lon = float(d.get("pickup_lon") or d.get("pickup_longitude"))
+            dest_lat   = float(d.get("dest_lat")   or d.get("destination_latitude"))
+            dest_lon   = float(d.get("dest_lon")   or d.get("destination_longitude"))
+        except (TypeError, ValueError):
+            return Response(
+                {"detail": "Champs requis: pickup_(lat|latitude), pickup_(lon|longitude), "
+                           "dest_(lat|latitude), dest_(lon|longitude)."},
+                status=status.HTTP_400_BAD_REQUEST
+            )
 
-        # Coordonnées (fallback si absentes)
-        pickup_lat = float(serializer.validated_data.get("pickup_latitude", 48.8566))
-        pickup_lon = float(serializer.validated_data.get("pickup_longitude", 2.3522))
-        dest_lat   = float(serializer.validated_data.get("destination_latitude", 49.0097))
-        dest_lon   = float(serializer.validated_data.get("destination_longitude", 2.5479))
+        vehicle_type = d.get("vehicle_type", "eco")
+        try:
+            passengers = int(d.get("passengers") or 1)
+        except (TypeError, ValueError):
+            passengers = 1
+        try:
+            luggage_count = int(d.get("luggage_count") or 0)
+        except (TypeError, ValueError):
+            luggage_count = 0
 
-        # Type de véhicule (eco par défaut)
-        vehicle_type = serializer.validated_data.get("vehicle_type", "eco")
-
-        # Calcul du prix avec tarifs dynamiques
-        pricing_result = PricingService.calculate_price(
+        estimate = PricingService.calculate_price(
             pickup_lat, pickup_lon, dest_lat, dest_lon, vehicle_type
+            # Si ton PricingService accepte ces kwargs, décommente :
+            # passengers=passengers, luggage_count=luggage_count
         )
+        estimate["pickup_coordinates"] = {"latitude": pickup_lat, "longitude": pickup_lon}
+        estimate["destination_coordinates"] = {"latitude": dest_lat, "longitude": dest_lon}
+        estimate["vehicle_type"] = vehicle_type
+        estimate["passengers"] = passengers
+        estimate["luggage_count"] = luggage_count
+        return Response({"success": True, "data": estimate}, status=status.HTTP_200_OK)
 
-        # Ajoute les coordonnées dans la réponse
-        pricing_result["pickup_coordinates"] = {
-            "latitude": pickup_lat,
-            "longitude": pickup_lon,
-        }
-        pricing_result["destination_coordinates"] = {
-            "latitude": dest_lat,
-            "longitude": dest_lon,
-        }
 
-        return Response(
-            {"success": True, "data": pricing_result},
-            status=status.HTTP_200_OK,
-        )
 class BookingCreateView(generics.CreateAPIView):
-    """View to create a reservation"""
+    """Création de réservation (invité ou connecté)"""
     queryset = Booking.objects.all()
     serializer_class = BookingCreateSerializer
-    permission_classes = [permissions.IsAuthenticated]
+    permission_classes = [permissions.AllowAny]
 
     def create(self, request, *args, **kwargs):
-        serializer = self.get_serializer(data=request.data)
-        serializer.is_valid(raise_exception=True)
+        """
+        Flux:
+         - Invité: CAPTCHA Turnstile OBLIGATOIRE (token dans request.data['captcha_token'])
+         - Utilisateur connecté: CAPTCHA optionnel (ici non exigé)
+         - Ensuite validation serializer + envoi notifications
+        """
+        # ✅ 1) CAPTCHA pour les invités
+        if not request.user.is_authenticated:
+            captcha_token = request.data.get("captcha_token")
+            ok, info = verify_turnstile_token(captcha_token, get_client_ip(request))
+            if not ok:
+                logger.warning(f"Turnstile failed (guest): info={info}")
+                return Response(
+                    {"success": False,
+                     "detail": "CAPTCHA invalide. Veuillez réessayer.",
+                     "captcha": info},
+                    status=status.HTTP_400_BAD_REQUEST
+                )
+
+        # ✅ 2) Validation serializer
+        serializer = self.get_serializer(data=request.data, context={'request': request})
+        if not serializer.is_valid():
+            logger.warning(f"BookingCreate validation errors: {serializer.errors}")
+            return Response({"success": False, "errors": serializer.errors}, status=status.HTTP_400_BAD_REQUEST)
+
+        # ✅ 3) Sauvegarde
         booking = serializer.save()
 
-        # Send confirmation email
+        # ✅ 4) Notifications
         NotificationService.send_booking_confirmation(booking)
+        try:
+            NotificationService.notify_admin_new_booking(booking)
+        except Exception:
+            logger.exception("Erreur lors de notify_admin_new_booking")
 
+        # ✅ 5) Réponse enrichie
         return Response({
             'success': True,
             'data': {
                 'booking_id': booking.id,
                 'confirmation_number': booking.confirmation_number,
                 'status': booking.status,
-                'estimated_price': booking.estimated_price
+                'status_display': booking.get_status_display(),
+                'vehicle_type': booking.vehicle_type,
+                'passengers': booking.passengers,
+                'luggage_count': booking.luggage_count,
+                'estimated_price': booking.estimated_price,
             }
         }, status=status.HTTP_201_CREATED)
 
 
 class BookingDetailView(generics.RetrieveAPIView):
-    """View to retrieve the details of a reservation"""
+    """Détails d'une réservation"""
     queryset = Booking.objects.all()
     serializer_class = BookingSerializer
     permission_classes = [permissions.IsAuthenticated]
 
     def get_queryset(self):
-        """Filter bookings by user type"""
+        """Admins: tout; Client: seulement ses réservations"""
         user = self.request.user
         if user.is_admin_user():
             return Booking.objects.all().select_related('user', 'driver')
-        else:
-            return Booking.objects.filter(user=user).select_related('driver')
+        return Booking.objects.filter(user=user).select_related('driver')
 
 
 class UserBookingsView(generics.ListAPIView):
-    """View for a user's booking history"""
+    """Historique des réservations d'un utilisateur"""
     serializer_class = BookingSerializer
     permission_classes = [permissions.IsAuthenticated]
 
@@ -157,7 +205,7 @@ class UserBookingsView(generics.ListAPIView):
         user = self.request.user
         queryset = Booking.objects.filter(user=user).select_related('driver')
 
-        # Filtering by status (optional)
+        # Filtre par statut (optionnel)
         status_filter = self.request.query_params.get('status')
         if status_filter:
             queryset = queryset.filter(status=status_filter)
@@ -170,7 +218,7 @@ class UserBookingsView(generics.ListAPIView):
 # ===============================
 
 class AdminBookingUpdateView(generics.UpdateAPIView):
-    """View to update a reservation (Admin only)"""
+    """Mise à jour d'une réservation (Admin seulement)"""
     queryset = Booking.objects.all()
     serializer_class = BookingUpdateSerializer
     permission_classes = [permissions.IsAuthenticated]
@@ -182,20 +230,19 @@ class AdminBookingUpdateView(generics.UpdateAPIView):
     def update(self, request, *args, **kwargs):
         partial = kwargs.pop('partial', False)
         instance = self.get_object()
-        serializer = self.get_serializer(
-            instance, data=request.data, partial=partial
-            )
+        serializer = self.get_serializer(instance, data=request.data, partial=partial)
         serializer.is_valid(raise_exception=True)
 
         # Save changes
         updated_booking = serializer.save()
         if updated_booking.status == 'COMPLETED':
-            # we set the end date of the race
+            # set end date of the ride
             updated_booking.completed_at = timezone.now()
             updated_booking.save()
+            # Générer la facture (idempotent côté service si déjà existante)
             InvoiceService.generate_invoice(updated_booking)
 
-        # Send notifications if necessary
+        # Notifications si chauffeur assigné
         if 'driver' in request.data and updated_booking.driver:
             NotificationService.send_driver_assignment(updated_booking)
 
@@ -204,39 +251,49 @@ class AdminBookingUpdateView(generics.UpdateAPIView):
             'data': {
                 'booking_id': updated_booking.id,
                 'new_status': updated_booking.status,
-                'updated_at': updated_booking.updated_at
+                'updated_at': getattr(updated_booking, "updated_at", timezone.now())
             }
         })
 
 
 class AdminDashboardView(APIView):
-    """View for the administrator dashboard"""
+    """Vue tableau de bord administrateur"""
     permission_classes = [permissions.IsAuthenticated]
 
     def get_permissions(self):
         return [permissions.IsAuthenticated(), IsAdminUser()]
 
     def get(self, request):
-        # Period to analyze (default: today)
+        # NOTE: le front envoie period in {today|week|month|all}. Défault 'today' gardé, mais 'all' est géré.
         period = request.query_params.get('period', 'today')
+        now = timezone.now()
 
+        # Base queryset (tri du plus récent au plus ancien)
+        qs = (
+            Booking.objects
+            .select_related('user', 'driver')
+            .order_by('-created_at')
+        )
+
+        # Filtrage par période
         if period == 'today':
-            start_date = timezone.now().replace(hour=0, minute=0, second=0)
-            end_date = timezone.now().replace(hour=23, minute=59, second=59)
+            start = now.replace(hour=0, minute=0, second=0, microsecond=0)
+            end   = now.replace(hour=23, minute=59, second=59, microsecond=999999)
+            qs = qs.filter(created_at__range=[start, end])
         elif period == 'week':
-            start_date = timezone.now() - timedelta(days=7)
-            end_date = timezone.now()
+            qs = qs.filter(created_at__gte=now - timedelta(days=7))
         elif period == 'month':
-            start_date = timezone.now() - timedelta(days=30)
-            end_date = timezone.now()
+            qs = qs.filter(created_at__gte=now - timedelta(days=30))
+        elif period == 'all':
+            pass  # pas de filtre de date
         else:
-            start_date = timezone.now().replace(hour=0, minute=0, second=0)
-            end_date = timezone.now().replace(hour=23, minute=59, second=59)
+            # fallback: today
+            start = now.replace(hour=0, minute=0, second=0, microsecond=0)
+            end   = now.replace(hour=23, minute=59, second=59, microsecond=999999)
+            qs = qs.filter(created_at__range=[start, end])
 
-        # Reservation statistics
-        bookings_stats = Booking.objects.filter(
-            created_at__range=[start_date, end_date]
-        ).aggregate(
+        # Statistiques sur la même période
+        bookings_stats = qs.aggregate(
             total=Count('id'),
             pending=Count('id', filter=Q(status='PENDING')),
             confirmed=Count('id', filter=Q(status='CONFIRMED')),
@@ -244,37 +301,31 @@ class AdminDashboardView(APIView):
             in_progress=Count('id', filter=Q(status='IN_PROGRESS')),
             completed=Count('id', filter=Q(status='COMPLETED')),
             cancelled=Count('id', filter=Q(status='CANCELLED')),
-            total_revenue=Sum('final_price', filter=Q(status='COMPLETED'))
-            or 0,
-            avg_price=Avg('estimated_price') or 0
+            total_revenue=Sum('final_price', filter=Q(status='COMPLETED')),
+            avg_price=Avg('estimated_price'),
         )
 
-        # Recent bookings
-        recent_bookings = Booking.objects.select_related('user', 'driver').order_by('-created_at')[:10]
-
         dashboard_data = {
-            'total_bookings': bookings_stats['total'],
-            'pending_bookings': bookings_stats['pending'],
-            'confirmed_bookings': bookings_stats['confirmed'],
-            'driver_assigned_bookings': bookings_stats['driver_assigned'],
-            'in_progress_bookings': bookings_stats['in_progress'],
-            'completed_bookings': bookings_stats['completed'],
-            'cancelled_bookings': bookings_stats['cancelled'],
-            'total_revenue': bookings_stats['total_revenue'],
-            'average_price': bookings_stats['avg_price'],
-            'recent_bookings': recent_bookings
+            'total_bookings': bookings_stats['total'] or 0,
+            'pending_bookings': bookings_stats['pending'] or 0,
+            'confirmed_bookings': bookings_stats['confirmed'] or 0,
+            'driver_assigned_bookings': bookings_stats['driver_assigned'] or 0,
+            'in_progress_bookings': bookings_stats['in_progress'] or 0,
+            'completed_bookings': bookings_stats['completed'] or 0,
+            'cancelled_bookings': bookings_stats['cancelled'] or 0,
+            'total_revenue': bookings_stats['total_revenue'] or 0,
+            'average_price': bookings_stats['avg_price'] or 0,
+            # Liste *sur la même période* (jusqu'à 500 pour la pagination front)
+            # -> Le serializer AdminDashboardSerializer se charge de sérialiser chaque réservation
+            'recent_bookings': list(qs[:500]),
         }
 
         serializer = AdminDashboardSerializer(dashboard_data)
-
-        return Response({
-            'success': True,
-            'data': serializer.data
-        })
+        return Response({'success': True, 'data': serializer.data})
 
 
 class DispatchView(APIView):
-    """View for dispatch actions"""
+    """Actions de dispatch (admin)"""
     permission_classes = [permissions.IsAuthenticated]
 
     def get_permissions(self):
@@ -327,13 +378,13 @@ class DispatchView(APIView):
                 }
             }, status=status.HTTP_404_NOT_FOUND)
 
+
 # ===============================
 # GESTION DES CHAUFFEURS
 # ===============================
 
-
 class DriverListView(generics.ListAPIView):
-    """View to list drivers (Admin)"""
+    """Liste des chauffeurs (Admin)"""
     queryset = Driver.objects.all()
     serializer_class = DriverSerializer
     permission_classes = [permissions.IsAuthenticated]
@@ -343,7 +394,7 @@ class DriverListView(generics.ListAPIView):
 
 
 class DriverCreateView(generics.CreateAPIView):
-    """View to create a driver (Admin)"""
+    """Création d'un chauffeur (Admin)"""
     queryset = Driver.objects.all()
     serializer_class = DriverSerializer
     permission_classes = [permissions.IsAuthenticated]
@@ -371,7 +422,6 @@ class DriverCreateView(generics.CreateAPIView):
 
 class IsAdminUser(permissions.BasePermission):
     """Custom permission for administrators"""
-
     def has_permission(self, request, view):
         return bool(
             request.user and
@@ -380,14 +430,18 @@ class IsAdminUser(permissions.BasePermission):
         )
 
 
+# ===============================
+# FACTURES
+# ===============================
+
 class InvoiceDetailView(generics.RetrieveAPIView):
-    """Retrieves the invoice associated with a reservation."""
+    """Récupère la facture d'une réservation."""
     queryset = Invoice.objects.all()
     serializer_class = InvoiceSerializer
     permission_classes = [permissions.IsAuthenticated]
 
     def get_permissions(self):
-        # All admins can, customers only their own invoices
+        # Admins: ok; Clients: seulement leurs factures
         base_perms = [permissions.IsAuthenticated()]
         inst = self.get_object()
         if self.request.user.is_admin_user() or inst.booking.user == self.request.user:
@@ -395,14 +449,14 @@ class InvoiceDetailView(generics.RetrieveAPIView):
         raise PermissionDenied("Vous n'avez pas le droit de voir cette facture.")
 
     def get_object(self):
-        # We rely on booking_id in the URL rather than pk of the invoice
+        # On se base sur booking_id passé dans l'URL
         booking_id = self.kwargs['booking_id']
         return Invoice.objects.get(booking__id=booking_id)
+
 
 # ===============================
 # VUE DE SANTÉ (sans authentification)
 # ===============================
-
 
 @api_view(['GET'])
 @permission_classes([permissions.AllowAny])
@@ -427,15 +481,49 @@ class TelegramWebhookView(APIView):
 
     def post(self, request):
         try:
-            # Process Telegram webhook
             data = json.loads(request.body)
-
-            # Here we could deal with Telegram updates
-            # For now, we just log in
             logger.info(f"Webhook Telegram reçu: {data}")
-
             return Response({'status': 'ok'})
-
         except Exception as e:
             logger.error(f"Erreur webhook Telegram: {e}")
             return Response({'error': str(e)}, status=400)
+
+
+
+class ContactView(APIView):
+    permission_classes = [AllowAny]
+    authentication_classes = []  # pas de JWT/CSRF requis pour ce formulaire public
+
+    def post(self, request):
+        serializer = ContactSerializer(data=request.data)
+        if not serializer.is_valid():
+            return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
+
+        data = serializer.validated_data
+
+        # Honeypot anti-spam
+        if data.get("company"):
+            return Response({"detail": "Spam détecté."}, status=status.HTTP_400_BAD_REQUEST)
+
+        to_email = getattr(settings, "CONTACT_DEFAULT_TO", "bookfrenchdriver@gmail.com")
+        subject = f"[Contact] {data.get('subject')}"
+        body = (
+            f"Nom: {data.get('full_name')}\n"
+            f"Email: {data.get('email')}\n"
+            f"Téléphone: {data.get('phone')}\n"
+            f"Raison: {data.get('reason') or '-'}\n\n"
+            f"Message:\n{data.get('message')}\n"
+        )
+
+        try:
+            send_mail(
+                subject=subject,
+                message=body,
+                from_email=getattr(settings, "DEFAULT_FROM_EMAIL", settings.EMAIL_HOST_USER),
+                recipient_list=[to_email],
+                fail_silently=False,
+            )
+        except Exception as e:
+            return Response({"detail": f"Envoi email impossible: {e}"}, status=status.HTTP_502_BAD_GATEWAY)
+
+        return Response({"detail": "Message envoyé. Merci !"}, status=status.HTTP_201_CREATED)

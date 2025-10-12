@@ -19,8 +19,7 @@ class User(AbstractUser):
     # Phone number validation (French/international format)
     phone_regex = RegexValidator(
         regex=r'^\+?1?\d{9,15}$',
-        message="Le numéro de téléphone doit être au format: '+999999999'."
-        " 9 à 15 chiffres autorisés."
+        message="Le numéro de téléphone doit être au format: '+999999999'. 9 à 15 chiffres autorisés."
     )
 
     # Additional fields
@@ -41,7 +40,6 @@ class User(AbstractUser):
 
     # Automatic timestamps
     created_at = models.DateTimeField(auto_now_add=True)
-    updated_at = models.DateTimeField(auto_now=True)
     updated_at = models.DateTimeField(auto_now=True)
 
     class Meta:
@@ -77,8 +75,7 @@ class Driver(models.Model):
 
     phone_regex = RegexValidator(
         regex=r'^\+?1?\d{9,15}$',
-        message="Le numéro de téléphone doit être au format: '+999999999'."
-        " 9 à 15 chiffres autorisés."
+        message="Le numéro de téléphone doit être au format: '+999999999'. 9 à 15 chiffres autorisés."
     )
 
     phone_number = models.CharField(
@@ -145,8 +142,7 @@ class Driver(models.Model):
         """Returns a vehicle summary (first 50 characters)"""
         if len(self.vehicle_info) > 50:
             return self.vehicle_info[:50] + "..."
-        else:
-            return self.vehicle_info
+        return self.vehicle_info
 
     def has_telegram(self):
         """Check if the driver has configured Telegram"""
@@ -171,12 +167,20 @@ class Booking(models.Model):
         ('CANCELLED', 'Annulée'),
     ]
 
+    VEHICLE_CHOICES = [
+        ('eco', 'Eco'),
+        ('berline', 'Berline'),
+        ('van', 'Van'),
+        ('goldwing', 'Goldwing'),
+    ]
+
     # Relationships
     user = models.ForeignKey(
         'User',
-        on_delete=models.CASCADE,
+        on_delete=models.SET_NULL,           # <= au lieu de CASCADE
+        null=True, blank=True,               # <= invité possible
         related_name='bookings',
-        help_text="Client qui a fait la réservation"
+        help_text="Client qui a fait la réservation (peut être null pour un invité)"
     )
 
     driver = models.ForeignKey(
@@ -188,56 +192,58 @@ class Booking(models.Model):
         help_text="Chauffeur assigné à la course"
     )
 
+    # --- Champs “invité” ---
+    guest_name = models.CharField(
+        max_length=120,
+        null=True, blank=True,
+        help_text="Nom du client invité (si non connecté)"
+    )
+    guest_phone = models.CharField(
+        max_length=32,
+        null=True, blank=True,
+        help_text="Téléphone du client invité"
+    )
+    guest_email = models.EmailField(
+        null=True, blank=True,
+        help_text="Email du client invité (pour confirmations)"
+    )
+
     # Departure addresses and coordinates
-    pickup_address = models.CharField(
-        max_length=255,
-        help_text="Adresse de départ"
-    )
-
-    pickup_latitude = models.DecimalField(
-        max_digits=10,
-        decimal_places=8,
-        help_text="Latitude du point de départ"
-    )
-
-    pickup_longitude = models.DecimalField(
-        max_digits=11,
-        decimal_places=8,
-        help_text="Longitude du point de départ"
-    )
+    pickup_address = models.CharField(max_length=255, help_text="Adresse de départ")
+    pickup_latitude = models.DecimalField(max_digits=10, decimal_places=8, help_text="Latitude du point de départ")
+    pickup_longitude = models.DecimalField(max_digits=11, decimal_places=8, help_text="Longitude du point de départ")
 
     # Destination addresses and coordinates
-    destination_address = models.CharField(
-        max_length=255,
-        help_text="Adresse de destination"
+    destination_address = models.CharField(max_length=255, help_text="Adresse de destination")
+    destination_latitude = models.DecimalField(max_digits=10, decimal_places=8, help_text="Latitude du point de destination")
+    destination_longitude = models.DecimalField(max_digits=11, decimal_places=8, help_text="Longitude du point de destination")
+
+    # --- Véhicule & capacité (NOUVEAU) ---
+    vehicle_type = models.CharField(
+        max_length=20,
+        choices=VEHICLE_CHOICES,
+        default='eco',
+        help_text="Type de véhicule demandé"
     )
 
-    destination_latitude = models.DecimalField(
-        max_digits=10,
-        decimal_places=8,
-        help_text="Latitude du point de destination"
+    passengers = models.PositiveSmallIntegerField(
+        default=1,
+        help_text="Nombre de passagers"
     )
 
-    destination_longitude = models.DecimalField(
-        max_digits=11,
-        decimal_places=8,
-        help_text="Longitude du point de destination"
+    luggage_count = models.PositiveSmallIntegerField(
+        default=0,
+        help_text="Nombre de bagages"
     )
 
     # Prices and pricing
-    estimated_price = models.DecimalField(
-        max_digits=8,
-        decimal_places=2,
-        help_text="Prix estimé de la course"
-    )
-
+    estimated_price = models.DecimalField(max_digits=8, decimal_places=2, help_text="Prix estimé de la course")
     final_price = models.DecimalField(
         max_digits=8,
         decimal_places=2,
         null=True,
         blank=True,
-        help_text="Prix final facturé."
-        " Pour l'instant égal à l'estimated_price."
+        help_text="Prix final facturé. Pour l'instant égal à l'estimated_price."
     )
 
     # Status and planning
@@ -247,19 +253,12 @@ class Booking(models.Model):
         default='PENDING',
         help_text="Statut actuel de la réservation"
     )
-
-    scheduled_time = models.DateTimeField(
-        help_text="Heure prévue pour la course"
-    )
+    scheduled_time = models.DateTimeField(help_text="Heure prévue pour la course")
 
     # Timestamps
     created_at = models.DateTimeField(auto_now_add=True)
     updated_at = models.DateTimeField(auto_now=True)
-    completed_at = models.DateTimeField(
-        null=True,
-        blank=True,
-        help_text="Heure de fin de course"
-    )
+    completed_at = models.DateTimeField(null=True, blank=True, help_text="Heure de fin de course")
 
     class Meta:
         db_table = 'bookings'
@@ -268,7 +267,8 @@ class Booking(models.Model):
         ordering = ['-created_at']
 
     def __str__(self):
-        return f"Réservation #{self.id} - {self.user.username} - {self.get_status_display()}"
+        who = self.user.username if getattr(self, "user_id", None) else (self.guest_name or "Invité")
+        return f"Réservation #{self.id} - {who} - {self.get_status_display()}"
 
     def save(self, *args, **kwargs):
         """Override save to set final_price if not set"""
@@ -278,55 +278,37 @@ class Booking(models.Model):
 
     @property
     def confirmation_number(self):
-        """Generates a unique confirmation number"""
         return f"VTC{self.id:06d}"
 
     def assign_driver(self, driver):
-        """Assign a driver to the reservation"""
         self.driver = driver
         self.status = 'DRIVER_ASSIGNED'
         self.save()
 
     def start_trip(self):
-        """Start the race"""
         if self.status == 'DRIVER_ASSIGNED':
             self.status = 'IN_PROGRESS'
             self.save()
 
     def complete_trip(self, final_price=None):
-        """Finish the race"""
         if self.status == 'IN_PROGRESS':
             self.status = 'COMPLETED'
             self.completed_at = timezone.now()
-            if final_price:
+            if final_price is not None:
                 self.final_price = final_price
             self.save()
             from core.services import InvoiceService
             InvoiceService.generate_invoice(self)
 
     def cancel(self):
-        """Cancel the reservation"""
         if self.status in ['PENDING', 'CONFIRMED', 'DRIVER_ASSIGNED']:
             self.status = 'CANCELLED'
             self.save()
 
-    def get_distance_display(self):
-        """
-        Calculates and displays distance
-        (to be implemented with the calculation service)
-        """
-        # Placeholder - sera implémenté avec PricingService
-        return "À calculer"
-
     def is_active(self):
-        """Check if the reservation is active"""
-        return self.status in [
-            'PENDING', 'CONFIRMED',
-            'DRIVER_ASSIGNED', 'IN_PROGRESS'
-            ]
+        return self.status in ['PENDING', 'CONFIRMED', 'DRIVER_ASSIGNED', 'IN_PROGRESS']
 
     def can_be_cancelled(self):
-        """Check if the reservation can be cancelled"""
         return self.status in ['PENDING', 'CONFIRMED', 'DRIVER_ASSIGNED']
 
 
@@ -381,7 +363,7 @@ class Invoice(models.Model):
     )
 
     generated_at = models.DateTimeField(auto_now_add=True)
-    sent_at      = models.DateTimeField(null=True, blank=True) 
+    sent_at = models.DateTimeField(null=True, blank=True)
 
     pdf_path = models.CharField(
         max_length=255,
@@ -404,8 +386,9 @@ class Invoice(models.Model):
         """
         if not self.invoice_number:
             # Generate a unique invoice number
-            year = timezone.now().year
-            month = timezone.now().month
+            now = timezone.now()
+            year = now.year
+            month = now.month
             count = Invoice.objects.filter(
                 generated_at__year=year,
                 generated_at__month=month

@@ -12,7 +12,7 @@ class CustomUserCreationForm(UserCreationForm):
         fields = (
             'username', 'email', 'first_name',
             'last_name', 'phone_number', 'user_type'
-            )
+        )
 
 
 class CustomUserChangeForm(UserChangeForm):
@@ -23,7 +23,7 @@ class CustomUserChangeForm(UserChangeForm):
         fields = (
             'username', 'email', 'first_name',
             'last_name', 'phone_number', 'user_type'
-            )
+        )
 
 
 @admin.register(User)
@@ -37,12 +37,12 @@ class UserAdmin(BaseUserAdmin):
     list_display = (
         'username', 'email', 'first_name', 'last_name',
         'user_type', 'is_active', 'created_at'
-        )
+    )
     list_filter = ('user_type', 'is_active', 'is_staff', 'created_at')
     search_fields = (
         'username', 'email', 'first_name',
         'last_name', 'phone_number'
-        )
+    )
 
     # Configuring fieldsets for editing
     fieldsets = BaseUserAdmin.fieldsets + (
@@ -57,7 +57,7 @@ class UserAdmin(BaseUserAdmin):
             'fields': (
                 'phone_number', 'user_type',
                 'first_name', 'last_name', 'email'
-                )
+            )
         }),
     )
 
@@ -70,7 +70,7 @@ class DriverAdmin(admin.ModelAdmin):
 
     list_display = (
         'name', 'email', 'phone_number', 'license_number',
-        'has_telegram', 'notifications_enabled', 'created_at'
+        'get_vehicle_summary', 'has_telegram', 'notifications_enabled', 'created_at'
     )
     list_filter = ('notifications_enabled', 'created_at')
     search_fields = (
@@ -117,14 +117,16 @@ class BookingAdmin(admin.ModelAdmin):
 
     list_display = (
         'id', 'confirmation_number', 'user', 'driver', 'status',
+        'vehicle_type', 'passengers', 'luggage_count',            # <-- nouveaux champs visibles
         'pickup_address', 'destination_address', 'estimated_price',
         'scheduled_time', 'created_at'
     )
 
-    list_filter = ('status', 'created_at', 'scheduled_time')
+    list_filter = ('status', 'vehicle_type', 'created_at', 'scheduled_time')  # <-- vehicle_type ajouté
     search_fields = (
         'user__username', 'user__email', 'driver__name',
-        'pickup_address', 'destination_address'
+        'pickup_address', 'destination_address',
+        'guest_name', 'guest_email'  # pour retrouver facilement les demandes invité
     )
 
     readonly_fields = ('confirmation_number', 'created_at', 'completed_at')
@@ -140,11 +142,18 @@ class BookingAdmin(admin.ModelAdmin):
                 'destination_longitude'
             )
         }),
+        ('Véhicule & capacité', {                                  # <-- nouveau bloc
+            'fields': ('vehicle_type', 'passengers', 'luggage_count'),
+        }),
         ('Tarification', {
             'fields': ('estimated_price', 'final_price')
         }),
         ('Planning', {
             'fields': ('scheduled_time', 'created_at', 'completed_at')
+        }),
+        ('Client invité (si applicable)', {                        # pratique pour visualiser
+            'fields': ('guest_name', 'guest_phone', 'guest_email'),
+            'classes': ('collapse',)
         }),
     )
 
